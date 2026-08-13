@@ -1,0 +1,30 @@
+{
+  "name": "🐾 Animals",
+  "words": [
+    {"word": "Elephant", "clue": "Has a trunk"},
+    {"word": "Penguin", "clue": "Tuxedo bird"},
+    {"word": "Dolphin", "clue": "Smart sea mammal"},
+    {"word": "Giraffe", "clue": "Tallest animal"},
+    {"word": "Chameleon", "clue": "Color changer"},
+    {"word": "Octopus", "clue": "Eight arms"},
+    {"word": "Peacock", "clue": "Colorful tail display"},
+    {"word": "Koala", "clue": "Sleepy tree hugger"},
+    {"word": "Flamingo", "clue": "Pink wading bird"},
+    {"word": "Tiger", "clue": "Striped big cat"},
+    {"word": "Panda", "clue": "Black and white bear"},
+    {"word": "Eagle", "clue": "Bird of prey"},
+    {"word": "Jellyfish", "clue": "Stinging blob"},
+    {"word": "Parrot", "clue": "Talking bird"},
+    {"word": "Whale", "clue": "Largest animal"},
+    {"word": "Crocodile", "clue": "Armored reptile"},
+    {"word": "Butterfly", "clue": "Winged insect"},
+    {"word": "Kangaroo", "clue": "Has a pouch"},
+    {"word": "Owl", "clue": "Night hunter"},
+    {"word": "Sloth", "clue": "Slowest mammal"},
+    {"word": "Seahorse", "clue": "Horse-shaped fish"},
+    {"word": "Gorilla", "clue": "Largest primate"},
+    {"word": "Cheetah", "clue": "Fastest land animal"},
+    {"word": "Polar Bear", "clue": "Arctic hunter"},
+    {"word": "Bat", "clue": "Flying mammal"}
+  ]
+}

@@ -1,0 +1,30 @@
+{
+  "name": "🍕 Food & Drinks",
+  "words": [
+    {"word": "Pizza", "clue": "Italian dish"},
+    {"word": "Sushi", "clue": "Japanese cuisine"},
+    {"word": "Burger", "clue": "Fast food"},
+    {"word": "Pasta", "clue": "Italian staple"},
+    {"word": "Taco", "clue": "Mexican wrap"},
+    {"word": "Ice Cream", "clue": "Cold dessert"},
+    {"word": "Chocolate", "clue": "Sweet treat"},
+    {"word": "Coffee", "clue": "Morning drink"},
+    {"word": "Pancake", "clue": "Breakfast flat cake"},
+    {"word": "Biryani", "clue": "Spiced rice dish"},
+    {"word": "Croissant", "clue": "French pastry"},
+    {"word": "Smoothie", "clue": "Blended drink"},
+    {"word": "Popcorn", "clue": "Movie snack"},
+    {"word": "Milkshake", "clue": "Thick cold drink"},
+    {"word": "Dosa", "clue": "South Indian crepe"},
+    {"word": "Cheesecake", "clue": "Creamy dessert"},
+    {"word": "Noodles", "clue": "Asian long food"},
+    {"word": "Samosa", "clue": "Fried triangle"},
+    {"word": "Waffles", "clue": "Grid-patterned breakfast"},
+    {"word": "Falafel", "clue": "Middle Eastern fritter"},
+    {"word": "Lasagna", "clue": "Layered pasta"},
+    {"word": "Donut", "clue": "Ring-shaped sweet"},
+    {"word": "Ramen", "clue": "Japanese noodle soup"},
+    {"word": "Kebab", "clue": "Grilled meat on stick"},
+    {"word": "Mango", "clue": "King of fruits"}
+  ]
+}

@@ -1,0 +1,30 @@
+{
+  "name": "🎬 Movies & Shows",
+  "words": [
+    {"word": "Titanic", "clue": "Ship disaster film"},
+    {"word": "Avengers", "clue": "Marvel superhero team"},
+    {"word": "Inception", "clue": "Dream within a dream"},
+    {"word": "Joker", "clue": "DC villain origin"},
+    {"word": "Harry Potter", "clue": "Wizard boy"},
+    {"word": "Spider-Man", "clue": "Web-slinging hero"},
+    {"word": "Frozen", "clue": "Let it go"},
+    {"word": "The Lion King", "clue": "Circle of life"},
+    {"word": "Stranger Things", "clue": "Upside down world"},
+    {"word": "Breaking Bad", "clue": "Chemistry teacher turns criminal"},
+    {"word": "Friends", "clue": "Six NYC pals"},
+    {"word": "Money Heist", "clue": "Red jumpsuits"},
+    {"word": "Squid Game", "clue": "Deadly children's games"},
+    {"word": "Batman", "clue": "Dark knight"},
+    {"word": "Toy Story", "clue": "Toys come alive"},
+    {"word": "Interstellar", "clue": "Space-time travel"},
+    {"word": "Jurassic Park", "clue": "Dinosaur theme park"},
+    {"word": "The Matrix", "clue": "Simulated reality"},
+    {"word": "Shrek", "clue": "Green ogre"},
+    {"word": "Game of Thrones", "clue": "Medieval fantasy war"},
+    {"word": "Gladiator", "clue": "Roman arena fighter"},
+    {"word": "Finding Nemo", "clue": "Lost clownfish"},
+    {"word": "Minions", "clue": "Yellow pill-shaped creatures"},
+    {"word": "John Wick", "clue": "Retired hitman's revenge"},
+    {"word": "RRR", "clue": "Indian freedom fighters"}
+  ]
+}
