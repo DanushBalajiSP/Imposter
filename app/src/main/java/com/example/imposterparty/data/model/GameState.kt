@@ -11,9 +11,8 @@ data class GameState(
     val secretClue: String? = null,
     val categoryName: String = "",
     val currentRevealIndex: Int = 0,
-    val revealOrder: List<Int> = emptyList(), // shuffled player indices
-    val discussionOrder: List<Int> = emptyList(), // round-robin from random start
-    val currentSpeakerIndex: Int = 0,
+    val revealOrder: List<Int> = emptyList(), // Sequential lobby player indices
+    val startingSpeakerIndex: Int = 0, // Randomly selected person who starts the conversation
     val timerRemainingSeconds: Int = 0,
     val isTimerRunning: Boolean = false,
     val currentVoterIndex: Int = 0,

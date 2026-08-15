@@ -1,13 +1,15 @@
 package com.example.imposterparty.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -20,9 +22,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.imposterparty.data.model.*
 import com.example.imposterparty.theme.*
@@ -40,15 +42,126 @@ fun GameSetupScreen(
     val wordPacks by gameViewModel.wordPacks.collectAsStateWithLifecycle()
     val settings = gameState.settings
 
-    var playerNames by remember { mutableStateOf(gameState.players.map { it.name }.toMutableList().also { if (it.isEmpty()) it.addAll(listOf("", "", "")) }) }
-    var newPlayerName by remember { mutableStateOf("") }
+    // Default player names initialized with "Player 1", "Player 2", "Player 3"
+    var playerNames by remember {
+        val initial = gameState.players.map { it.name }.toMutableList()
+        if (initial.size < 3) {
+            while (initial.size < 3) {
+                initial.add("Player ${initial.size + 1}")
+            }
+        }
+        mutableStateOf(initial)
+    }
+
     var showCustomTimer by remember { mutableStateOf(settings.timerDuration == TimerDuration.CUSTOM) }
     var customMinutes by remember { mutableStateOf((settings.customTimerSeconds / 60).toString()) }
     var customSeconds by remember { mutableStateOf((settings.customTimerSeconds % 60).toString()) }
+    var showPackSelectorDialog by remember { mutableStateOf(false) }
 
     fun updatePlayerList() {
-        val validNames = playerNames.filter { it.isNotBlank() }
-        gameViewModel.setPlayerNames(validNames)
+        val resolved = playerNames.mapIndexed { index, name ->
+            if (name.isBlank()) "Player ${index + 1}" else name.trim()
+        }
+        gameViewModel.setPlayerNames(resolved)
+    }
+
+    // Category Selector Dialog
+    if (showPackSelectorDialog) {
+        AlertDialog(
+            onDismissRequest = { showPackSelectorDialog = false },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        "Select Word Packs",
+                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Black),
+                        modifier = Modifier.weight(1f),
+                    )
+                    TextButton(
+                        onClick = {
+                            val allIds = wordPacks.map { it.id }.toSet()
+                            val newSelected = if (settings.selectedCategoryIds.size == allIds.size) {
+                                emptySet()
+                            } else {
+                                allIds
+                            }
+                            gameViewModel.updateSettings(settings.copy(selectedCategoryIds = newSelected))
+                        },
+                    ) {
+                        Text(
+                            if (settings.selectedCategoryIds.size == wordPacks.size) "Clear" else "Select All",
+                            color = ImposterPrimaryLight,
+                            fontWeight = FontWeight.Bold,
+                        )
+                    }
+                }
+            },
+            text = {
+                LazyColumn(
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.heightIn(max = 350.dp),
+                ) {
+                    items(wordPacks) { pack ->
+                        val isSelected = settings.selectedCategoryIds.isEmpty() || settings.selectedCategoryIds.contains(pack.id)
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(if (isSelected) DarkSurfaceVariant else DarkSurfaceVariant.copy(alpha = 0.4f))
+                                .clickable {
+                                    val current = if (settings.selectedCategoryIds.isEmpty()) {
+                                        wordPacks.map { it.id }.toSet()
+                                    } else {
+                                        settings.selectedCategoryIds
+                                    }
+                                    val newSelected = if (current.contains(pack.id)) {
+                                        current - pack.id
+                                    } else {
+                                        current + pack.id
+                                    }
+                                    gameViewModel.updateSettings(settings.copy(selectedCategoryIds = newSelected))
+                                }
+                                .padding(10.dp),
+                        ) {
+                            Checkbox(
+                                checked = isSelected,
+                                onCheckedChange = { checked ->
+                                    val current = if (settings.selectedCategoryIds.isEmpty()) {
+                                        wordPacks.map { it.id }.toSet()
+                                    } else {
+                                        settings.selectedCategoryIds
+                                    }
+                                    val newSelected = if (checked) current + pack.id else current - pack.id
+                                    gameViewModel.updateSettings(settings.copy(selectedCategoryIds = newSelected))
+                                },
+                                colors = CheckboxDefaults.colors(
+                                    checkedColor = ImposterSecondary,
+                                    checkmarkColor = DarkBackground,
+                                ),
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                pack.name,
+                                style = MaterialTheme.typography.bodyLarge.copy(
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                ),
+                                color = if (isSelected) TextOnDark else TextOnDarkSecondary,
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = { showPackSelectorDialog = false },
+                    colors = ButtonDefaults.buttonColors(containerColor = ImposterPrimary),
+                    shape = RoundedCornerShape(12.dp),
+                ) {
+                    Text("Done", fontWeight = FontWeight.Bold)
+                }
+            },
+        )
     }
 
     Box(
@@ -73,16 +186,18 @@ fun GameSetupScreen(
                     }
                     Text(
                         "Game Setup",
-                        style = MaterialTheme.typography.headlineMedium,
+                        style = MaterialTheme.typography.headlineMedium.copy(
+                            fontWeight = FontWeight.Black,
+                        ),
                         color = TextOnDark,
-                        fontWeight = FontWeight.Bold,
                     )
                 }
             }
 
             // ── Players Section ──
             item {
-                SectionHeader("👥 Players (${playerNames.count { it.isNotBlank() }})")
+                SectionHeader("👥 Players (${playerNames.size})")
+                Spacer(Modifier.height(8.dp))
             }
 
             itemsIndexed(playerNames) { index, name ->
@@ -139,13 +254,14 @@ fun GameSetupScreen(
                 if (playerNames.size < 12) {
                     TextButton(
                         onClick = {
-                            playerNames = playerNames.toMutableList().also { it.add("") }
+                            playerNames = playerNames.toMutableList().also { it.add("Player ${it.size + 1}") }
+                            updatePlayerList()
                         },
                         modifier = Modifier.padding(top = 4.dp),
                     ) {
                         Icon(Icons.Default.Add, null, tint = ImposterSecondary)
                         Spacer(Modifier.width(8.dp))
-                        Text("Add Player", color = ImposterSecondary)
+                        Text("Add Player", color = ImposterSecondary, fontWeight = FontWeight.Bold)
                     }
                 }
                 Spacer(Modifier.height(24.dp))
@@ -220,7 +336,7 @@ fun GameSetupScreen(
                                 )
                                 IconButton(
                                     onClick = {
-                                        val max = (playerNames.count { it.isNotBlank() } - 1).coerceAtLeast(1)
+                                        val max = (playerNames.size - 1).coerceAtLeast(1)
                                         val newCount = (settings.manualImposterCount + 1).coerceAtMost(max)
                                         gameViewModel.updateSettings(settings.copy(manualImposterCount = newCount))
                                     },
@@ -291,41 +407,111 @@ fun GameSetupScreen(
                 Spacer(Modifier.height(24.dp))
             }
 
-            // ── Category Section ──
+            // ── Category Section (Shows Selected Word Packs Only) ──
             item {
-                SectionHeader("📦 Word Category")
+                val selectedPacks = if (settings.selectedCategoryIds.isEmpty()) {
+                    wordPacks
+                } else {
+                    wordPacks.filter { settings.selectedCategoryIds.contains(it.id) }
+                }
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    SectionHeader("📦 Selected Word Packs (${selectedPacks.size})")
+                    Spacer(Modifier.weight(1f))
+                    FilledTonalButton(
+                        onClick = { showPackSelectorDialog = true },
+                        colors = ButtonDefaults.filledTonalButtonColors(
+                            containerColor = ImposterSecondary.copy(alpha = 0.2f),
+                            contentColor = ImposterSecondary,
+                        ),
+                        shape = RoundedCornerShape(10.dp),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                    ) {
+                        Icon(Icons.Default.Tune, null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Change", fontWeight = FontWeight.Bold)
+                    }
+                }
                 Spacer(Modifier.height(8.dp))
 
-                if (wordPacks.isEmpty()) {
-                    Text(
-                        "Loading categories...",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = TextOnDarkSecondary,
-                    )
+                if (selectedPacks.isEmpty()) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = DangerRed.copy(alpha = 0.15f)),
+                        shape = RoundedCornerShape(14.dp),
+                        border = BorderStroke(1.dp, DangerRed.copy(alpha = 0.3f)),
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(14.dp),
+                        ) {
+                            Text(
+                                "No word packs selected! Tap Change to select packs.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = TextOnDark,
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
+                    }
                 } else {
                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        wordPacks.forEach { pack ->
-                            val selected = settings.selectedCategoryId == pack.id
-                            FilterChip(
-                                selected = selected,
-                                onClick = {
-                                    gameViewModel.updateSettings(settings.copy(selectedCategoryId = pack.id))
-                                },
-                                label = {
+                        selectedPacks.forEach { pack ->
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = CardDefaults.cardColors(containerColor = DarkSurfaceVariant.copy(alpha = 0.6f)),
+                                shape = RoundedCornerShape(14.dp),
+                                border = BorderStroke(1.dp, ImposterTertiary.copy(alpha = 0.4f)),
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                                ) {
                                     Text(
                                         pack.name,
-                                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                                        color = TextOnDark,
+                                        modifier = Modifier.weight(1f),
                                     )
-                                },
-                                leadingIcon = if (selected) {
-                                    { Icon(Icons.Default.Check, null, modifier = Modifier.size(18.dp)) }
-                                } else null,
-                                colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = ImposterTertiary,
-                                    selectedLabelColor = DarkBackground,
-                                ),
-                                modifier = Modifier.fillMaxWidth(),
-                            )
+                                    Surface(
+                                        color = if (pack.isBuiltIn) ImposterSecondary.copy(alpha = 0.15f) else ImposterTertiary.copy(alpha = 0.15f),
+                                        shape = RoundedCornerShape(6.dp),
+                                    ) {
+                                        Text(
+                                            if (pack.isBuiltIn) "Built-in" else "Custom",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = if (pack.isBuiltIn) ImposterSecondary else ImposterTertiary,
+                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                        )
+                                    }
+                                    Spacer(Modifier.width(8.dp))
+                                    IconButton(
+                                        onClick = {
+                                            val current = if (settings.selectedCategoryIds.isEmpty()) {
+                                                wordPacks.map { it.id }.toSet()
+                                            } else {
+                                                settings.selectedCategoryIds
+                                            }
+                                            val newSelected = current - pack.id
+                                            gameViewModel.updateSettings(settings.copy(selectedCategoryIds = newSelected))
+                                        },
+                                        modifier = Modifier.size(24.dp),
+                                    ) {
+                                        Icon(
+                                            Icons.Default.Close,
+                                            contentDescription = "Remove pack",
+                                            tint = TextOnDarkSecondary,
+                                            modifier = Modifier.size(18.dp),
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -333,86 +519,137 @@ fun GameSetupScreen(
                 Spacer(Modifier.height(24.dp))
             }
 
-            // ── Timer Section ──
+            // ── Discussion Timer Section ──
             item {
-                SectionHeader("⏱️ Discussion Timer")
-                Spacer(Modifier.height(8.dp))
-
                 Row(
+                    verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    TimerDuration.entries.forEach { duration ->
-                        val selected = settings.timerDuration == duration
-                        FilterChip(
-                            selected = selected,
-                            onClick = {
-                                gameViewModel.updateSettings(settings.copy(timerDuration = duration))
-                                showCustomTimer = duration == TimerDuration.CUSTOM
-                            },
-                            label = {
-                                Text(
-                                    duration.label,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                    SectionHeader("⏱️ Discussion Timer")
+                    Spacer(Modifier.weight(1f))
+                    Switch(
+                        checked = settings.isTimerEnabled,
+                        onCheckedChange = { isEnabled ->
+                            gameViewModel.updateSettings(settings.copy(isTimerEnabled = isEnabled))
+                        },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = WarningYellow,
+                            checkedTrackColor = WarningYellow.copy(alpha = 0.4f),
+                        ),
+                    )
+                }
+
+                AnimatedVisibility(visible = settings.isTimerEnabled) {
+                    Column {
+                        Spacer(Modifier.height(8.dp))
+
+                        // Duration chips
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            TimerDuration.entries.forEach { duration ->
+                                val selected = settings.timerDuration == duration
+                                FilterChip(
+                                    selected = selected,
+                                    onClick = {
+                                        gameViewModel.updateSettings(settings.copy(timerDuration = duration))
+                                        showCustomTimer = duration == TimerDuration.CUSTOM
+                                    },
+                                    label = {
+                                        Text(
+                                            duration.label,
+                                            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                                        )
+                                    },
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        selectedContainerColor = WarningYellow,
+                                        selectedLabelColor = DarkBackground,
+                                    ),
+                                    modifier = Modifier.weight(1f),
                                 )
-                            },
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = WarningYellow,
-                                selectedLabelColor = DarkBackground,
-                            ),
-                        )
+                            }
+                        }
+
+                        // Custom timer inputs
+                        AnimatedVisibility(visible = showCustomTimer) {
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 12.dp),
+                                colors = CardDefaults.cardColors(containerColor = DarkSurfaceVariant.copy(alpha = 0.6f)),
+                                shape = RoundedCornerShape(16.dp),
+                            ) {
+                                Column(modifier = Modifier.padding(16.dp)) {
+                                    Text(
+                                        "Custom Duration",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = TextOnDarkSecondary,
+                                    )
+                                    Spacer(Modifier.height(8.dp))
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    ) {
+                                        OutlinedTextField(
+                                            value = customMinutes,
+                                            onValueChange = {
+                                                if (it.length <= 2 && it.all { c -> c.isDigit() }) {
+                                                    customMinutes = it
+                                                    val mins = it.toIntOrNull() ?: 0
+                                                    val secs = customSeconds.toIntOrNull() ?: 0
+                                                    gameViewModel.updateSettings(
+                                                        settings.copy(customTimerSeconds = (mins * 60 + secs).coerceAtLeast(10))
+                                                    )
+                                                }
+                                            },
+                                            label = { Text("Min") },
+                                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                            modifier = Modifier.weight(1f),
+                                            singleLine = true,
+                                            shape = RoundedCornerShape(8.dp),
+                                        )
+                                        Text(":", style = MaterialTheme.typography.headlineMedium, color = TextOnDark)
+                                        OutlinedTextField(
+                                            value = customSeconds,
+                                            onValueChange = {
+                                                if (it.length <= 2 && it.all { c -> c.isDigit() }) {
+                                                    val s = it.toIntOrNull() ?: 0
+                                                    if (s < 60) {
+                                                        customSeconds = it
+                                                        val mins = customMinutes.toIntOrNull() ?: 0
+                                                        gameViewModel.updateSettings(
+                                                            settings.copy(customTimerSeconds = (mins * 60 + s).coerceAtLeast(10))
+                                                        )
+                                                    }
+                                                }
+                                            },
+                                            label = { Text("Sec") },
+                                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                            modifier = Modifier.weight(1f),
+                                            singleLine = true,
+                                            shape = RoundedCornerShape(8.dp),
+                                        )
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
 
-                AnimatedVisibility(visible = showCustomTimer) {
-                    Row(
+                AnimatedVisibility(visible = !settings.isTimerEnabled) {
+                    Card(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(top = 12.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
+                            .padding(top = 8.dp),
+                        colors = CardDefaults.cardColors(containerColor = DarkSurfaceVariant.copy(alpha = 0.4f)),
+                        shape = RoundedCornerShape(12.dp),
                     ) {
-                        OutlinedTextField(
-                            value = customMinutes,
-                            onValueChange = {
-                                customMinutes = it.filter { c -> c.isDigit() }.take(2)
-                                val mins = customMinutes.toIntOrNull() ?: 0
-                                val secs = customSeconds.toIntOrNull() ?: 0
-                                gameViewModel.updateSettings(
-                                    settings.copy(customTimerSeconds = mins * 60 + secs)
-                                )
-                            },
-                            label = { Text("Min") },
-                            modifier = Modifier.weight(1f),
-                            singleLine = true,
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            shape = RoundedCornerShape(12.dp),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = WarningYellow,
-                                unfocusedBorderColor = DarkSurfaceVariant,
-                            ),
-                        )
-                        Text(":", color = TextOnDark, style = MaterialTheme.typography.headlineMedium)
-                        OutlinedTextField(
-                            value = customSeconds,
-                            onValueChange = {
-                                customSeconds = it.filter { c -> c.isDigit() }.take(2)
-                                val mins = customMinutes.toIntOrNull() ?: 0
-                                val secs = customSeconds.toIntOrNull() ?: 0
-                                gameViewModel.updateSettings(
-                                    settings.copy(customTimerSeconds = mins * 60 + secs)
-                                )
-                            },
-                            label = { Text("Sec") },
-                            modifier = Modifier.weight(1f),
-                            singleLine = true,
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            shape = RoundedCornerShape(12.dp),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = WarningYellow,
-                                unfocusedBorderColor = DarkSurfaceVariant,
-                            ),
+                        Text(
+                            "Untimed discussion. Players can talk freely and tap 'Vote Now' when ready.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = TextOnDarkSecondary,
+                            modifier = Modifier.padding(12.dp),
                         )
                     }
                 }
@@ -421,32 +658,39 @@ fun GameSetupScreen(
             }
         }
 
-        // Start button (floating at bottom)
-        val validPlayerCount = playerNames.count { it.isNotBlank() }
-        val canStart = validPlayerCount >= 3 && settings.selectedCategoryId > 0
-
+        // Start button (ALWAYS enabled)
         Button(
             onClick = {
-                updatePlayerList()
+                val resolved = playerNames.mapIndexed { index, name ->
+                    if (name.isBlank()) "Player ${index + 1}" else name.trim()
+                }.toMutableList()
+                while (resolved.size < 3) {
+                    resolved.add("Player ${resolved.size + 1}")
+                }
+                playerNames = resolved
+                gameViewModel.setPlayerNames(resolved)
                 onStartGame()
             },
-            enabled = canStart,
+            enabled = true,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(20.dp)
-                .height(56.dp)
+                .height(58.dp)
                 .align(Alignment.BottomCenter),
-            shape = RoundedCornerShape(16.dp),
+            shape = RoundedCornerShape(18.dp),
             colors = ButtonDefaults.buttonColors(
                 containerColor = ImposterPrimary,
                 disabledContainerColor = DarkSurfaceVariant,
             ),
+            border = BorderStroke(1.5.dp, Color.White.copy(alpha = 0.3f)),
         ) {
-            Icon(Icons.Default.PlayArrow, null)
+            Icon(Icons.Default.PlayArrow, null, modifier = Modifier.size(24.dp))
             Spacer(Modifier.width(8.dp))
             Text(
-                if (canStart) "Start Game" else "Add ${3 - validPlayerCount} more players & pick a category",
-                fontWeight = FontWeight.Bold,
+                "Start Game",
+                fontWeight = FontWeight.Black,
+                style = MaterialTheme.typography.titleMedium,
+                color = Color.White,
             )
         }
     }
@@ -456,8 +700,10 @@ fun GameSetupScreen(
 private fun SectionHeader(title: String) {
     Text(
         title,
-        style = MaterialTheme.typography.titleMedium,
+        style = MaterialTheme.typography.titleMedium.copy(
+            fontWeight = FontWeight.ExtraBold,
+            letterSpacing = 0.5.sp,
+        ),
         color = TextOnDark,
-        fontWeight = FontWeight.Bold,
     )
 }

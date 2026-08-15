@@ -1,5 +1,6 @@
 package com.example.imposterparty.ui.screens
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -22,6 +23,7 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.imposterparty.data.model.GamePhase
 import com.example.imposterparty.theme.*
@@ -56,40 +58,45 @@ fun VotingScreen(
         ) {
             // Header
             Text(
-                "🗳️ Voting",
-                style = MaterialTheme.typography.headlineMedium,
+                "🗳️ Secret Voting",
+                style = MaterialTheme.typography.headlineMedium.copy(
+                    fontWeight = FontWeight.Black,
+                    letterSpacing = 1.sp,
+                ),
                 color = TextOnDark,
-                fontWeight = FontWeight.Bold,
             )
 
             Spacer(Modifier.height(4.dp))
 
             Text(
-                "Player ${gameState.currentVoterIndex + 1} of ${gameState.players.size}",
-                style = MaterialTheme.typography.bodyMedium,
-                color = TextOnDarkSecondary,
+                "Voter ${gameState.currentVoterIndex + 1} of ${gameState.players.size}",
+                style = MaterialTheme.typography.titleMedium.copy(
+                    fontWeight = FontWeight.ExtraBold,
+                ),
+                color = ImposterPrimaryLight,
             )
 
-            Spacer(Modifier.height(4.dp))
+            Spacer(Modifier.height(6.dp))
 
             LinearProgressIndicator(
-                progress = { gameState.currentVoterIndex.toFloat() / gameState.players.size },
+                progress = { (gameState.currentVoterIndex.toFloat()) / gameState.players.size },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(4.dp)
-                    .clip(RoundedCornerShape(2.dp)),
+                    .height(6.dp)
+                    .clip(RoundedCornerShape(3.dp)),
                 color = ImposterPrimary,
                 trackColor = DarkSurfaceVariant,
             )
 
-            Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(20.dp))
 
             if (currentVoter != null) {
                 // Current voter info
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = DarkSurfaceVariant.copy(alpha = 0.6f)),
-                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = DarkSurfaceVariant.copy(alpha = 0.7f)),
+                    shape = RoundedCornerShape(18.dp),
+                    border = BorderStroke(1.5.dp, ImposterSecondary.copy(alpha = 0.3f)),
                 ) {
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
@@ -99,19 +106,26 @@ fun VotingScreen(
                     ) {
                         Text(
                             "Pass phone to",
-                            style = MaterialTheme.typography.bodyMedium,
+                            style = MaterialTheme.typography.bodyMedium.copy(
+                                fontWeight = FontWeight.SemiBold,
+                            ),
                             color = TextOnDarkSecondary,
                         )
+                        Spacer(Modifier.height(2.dp))
                         Text(
                             currentVoter.name,
-                            style = MaterialTheme.typography.headlineSmall,
+                            style = MaterialTheme.typography.headlineMedium.copy(
+                                fontWeight = FontWeight.Black,
+                            ),
                             color = ImposterSecondary,
-                            fontWeight = FontWeight.Bold,
                         )
+                        Spacer(Modifier.height(4.dp))
                         Text(
                             "Who do you think is the Imposter?",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = TextOnDarkSecondary,
+                            style = MaterialTheme.typography.bodyMedium.copy(
+                                fontWeight = FontWeight.ExtraBold,
+                            ),
+                            color = WarningYellow,
                         )
                     }
                 }
@@ -120,7 +134,7 @@ fun VotingScreen(
 
                 // Player list to vote for
                 LazyColumn(
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
                     modifier = Modifier.weight(1f),
                 ) {
                     val otherPlayers = gameState.players.filter { it.id != currentVoter.id }
@@ -135,28 +149,28 @@ fun VotingScreen(
                                     haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                 },
                             colors = CardDefaults.cardColors(
-                                containerColor = if (isSelected) ImposterPrimary.copy(alpha = 0.2f)
-                                else DarkSurfaceVariant.copy(alpha = 0.4f),
+                                containerColor = if (isSelected) ImposterPrimary.copy(alpha = 0.25f)
+                                else DarkSurfaceVariant.copy(alpha = 0.5f),
                             ),
                             shape = RoundedCornerShape(16.dp),
-                            border = if (isSelected) CardDefaults.outlinedCardBorder().copy(
-                                width = 2.dp,
-                                brush = Brush.horizontalGradient(listOf(ImposterPrimary, ImposterSecondary)),
-                            ) else null,
+                            border = BorderStroke(
+                                width = if (isSelected) 2.5.dp else 1.dp,
+                                color = if (isSelected) ImposterSecondary else DarkSurfaceHigh,
+                            ),
                         ) {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(16.dp),
+                                    .padding(horizontal = 16.dp, vertical = 14.dp),
                             ) {
                                 Box(
                                     modifier = Modifier
-                                        .size(40.dp)
+                                        .size(44.dp)
                                         .clip(CircleShape)
                                         .background(
-                                            if (isSelected) ImposterPrimary
-                                            else DarkSurfaceHigh
+                                            if (isSelected) ImposterSecondary
+                                             else DarkSurfaceHigh
                                         ),
                                     contentAlignment = Alignment.Center,
                                 ) {
@@ -164,23 +178,26 @@ fun VotingScreen(
                                         Icon(
                                             Icons.Default.Check,
                                             null,
-                                            tint = Color.White,
-                                            modifier = Modifier.size(20.dp),
+                                            tint = DarkBackground,
+                                            modifier = Modifier.size(24.dp),
                                         )
                                     } else {
                                         Text(
                                             player.name.first().uppercase(),
-                                            style = MaterialTheme.typography.titleMedium,
-                                            color = TextOnDarkSecondary,
+                                            style = MaterialTheme.typography.titleLarge.copy(
+                                                fontWeight = FontWeight.Black,
+                                            ),
+                                            color = TextOnDark,
                                         )
                                     }
                                 }
                                 Spacer(Modifier.width(16.dp))
                                 Text(
                                     player.name,
-                                    style = MaterialTheme.typography.titleMedium,
-                                    color = if (isSelected) ImposterPrimary else TextOnDark,
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                    style = MaterialTheme.typography.titleLarge.copy(
+                                        fontWeight = if (isSelected) FontWeight.Black else FontWeight.Bold,
+                                    ),
+                                    color = if (isSelected) ImposterSecondary else TextOnDark,
                                 )
                             }
                         }
@@ -200,16 +217,24 @@ fun VotingScreen(
                     enabled = selectedPlayerId != null,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(56.dp),
-                    shape = RoundedCornerShape(16.dp),
+                        .height(58.dp),
+                    shape = RoundedCornerShape(18.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = ImposterPrimary,
+                        containerColor = DangerRed,
                         disabledContainerColor = DarkSurfaceVariant,
                     ),
+                    border = BorderStroke(
+                        width = if (selectedPlayerId != null) 1.5.dp else 0.dp,
+                        color = if (selectedPlayerId != null) Color.White.copy(alpha = 0.4f) else Color.Transparent
+                    ),
                 ) {
-                    Icon(Icons.Default.HowToVote, null)
-                    Spacer(Modifier.width(8.dp))
-                    Text("Cast Vote", fontWeight = FontWeight.Bold)
+                    Icon(Icons.Default.HowToVote, null, modifier = Modifier.size(22.dp))
+                    Spacer(Modifier.width(10.dp))
+                    Text(
+                        "Submit Secret Vote",
+                        fontWeight = FontWeight.Black,
+                        style = MaterialTheme.typography.titleMedium,
+                    )
                 }
             }
         }

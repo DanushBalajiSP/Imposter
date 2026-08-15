@@ -1,30 +1,105 @@
 {
   "name": "🎬 Movies & Shows",
   "words": [
-    {"word": "Titanic", "clue": "Ship disaster film"},
-    {"word": "Avengers", "clue": "Marvel superhero team"},
-    {"word": "Inception", "clue": "Dream within a dream"},
-    {"word": "Joker", "clue": "DC villain origin"},
-    {"word": "Harry Potter", "clue": "Wizard boy"},
-    {"word": "Spider-Man", "clue": "Web-slinging hero"},
-    {"word": "Frozen", "clue": "Let it go"},
-    {"word": "The Lion King", "clue": "Circle of life"},
-    {"word": "Stranger Things", "clue": "Upside down world"},
-    {"word": "Breaking Bad", "clue": "Chemistry teacher turns criminal"},
-    {"word": "Friends", "clue": "Six NYC pals"},
-    {"word": "Money Heist", "clue": "Red jumpsuits"},
-    {"word": "Squid Game", "clue": "Deadly children's games"},
-    {"word": "Batman", "clue": "Dark knight"},
-    {"word": "Toy Story", "clue": "Toys come alive"},
-    {"word": "Interstellar", "clue": "Space-time travel"},
-    {"word": "Jurassic Park", "clue": "Dinosaur theme park"},
-    {"word": "The Matrix", "clue": "Simulated reality"},
-    {"word": "Shrek", "clue": "Green ogre"},
-    {"word": "Game of Thrones", "clue": "Medieval fantasy war"},
-    {"word": "Gladiator", "clue": "Roman arena fighter"},
-    {"word": "Finding Nemo", "clue": "Lost clownfish"},
-    {"word": "Minions", "clue": "Yellow pill-shaped creatures"},
-    {"word": "John Wick", "clue": "Retired hitman's revenge"},
-    {"word": "RRR", "clue": "Indian freedom fighters"}
+    {
+      "word": "Titanic",
+      "clue": "Movie & Shows"
+    },
+    {
+      "word": "Avengers",
+      "clue": "Movie & Shows"
+    },
+    {
+      "word": "Inception",
+      "clue": "Movie & Shows"
+    },
+    {
+      "word": "Joker",
+      "clue": "Movie & Shows"
+    },
+    {
+      "word": "Harry Potter",
+      "clue": "Movie & Shows"
+    },
+    {
+      "word": "Spider-Man",
+      "clue": "Movie & Shows"
+    },
+    {
+      "word": "Frozen",
+      "clue": "Movie & Shows"
+    },
+    {
+      "word": "The Lion King",
+      "clue": "Movie & Shows"
+    },
+    {
+      "word": "Stranger Things",
+      "clue": "Movie & Shows"
+    },
+    {
+      "word": "Breaking Bad",
+      "clue": "Movie & Shows"
+    },
+    {
+      "word": "Jana Nayagan",
+      "clue": "Movie & Shows"
+    },
+    {
+      "word": "Money Heist",
+      "clue": "Movie & Shows"
+    },
+    {
+      "word": "Squid Game",
+      "clue": "Movie & Shows"
+    },
+    {
+      "word": "Batman",
+      "clue": "Movie & Shows"
+    },
+    {
+      "word": "Karuppu",
+      "clue": "Movie & Shows"
+    },
+    {
+      "word": "Interstellar",
+      "clue": "Movie & Shows"
+    },
+    {
+      "word": "Jurassic Park",
+      "clue": "Movie & Shows"
+    },
+    {
+      "word": "The Matrix",
+      "clue": "Movie & Shows"
+    },
+    {
+      "word": "Valimai",
+      "clue": "Movie & Shows"
+    },
+    {
+      "word": "Game of Thrones",
+      "clue": "Movie & Shows"
+    },
+    {
+      "word": "GOAT",
+      "clue": "Movie & Shows"
+    },
+    {
+      "word": "Finding Nemo",
+      "clue": "Movie & Shows"
+    },
+    {
+      "word": "Minions",
+      "clue": "Movie & Shows"
+    },
+    {
+      "word": "John Wick",
+      "clue": "Movie & Shows"
+    },
+    {
+      "word": "RRR",
+      "clue": "Movie & Shows"
+    }
   ]
 }

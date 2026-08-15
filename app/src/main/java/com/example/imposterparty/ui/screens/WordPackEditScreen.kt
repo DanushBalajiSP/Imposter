@@ -33,6 +33,7 @@ fun WordPackEditScreen(
     var packName by remember { mutableStateOf("") }
     var entries by remember { mutableStateOf(listOf(Pair("", ""))) }
     var initialized by remember { mutableStateOf(false) }
+    var showTitleError by remember { mutableStateOf(false) }
 
     // Load existing pack and entries when editing
     LaunchedEffect(packId) {
@@ -51,7 +52,7 @@ fun WordPackEditScreen(
         }
     }
 
-    val canSave = packName.isNotBlank() && entries.any { it.first.isNotBlank() }
+    val canSave = entries.any { it.first.isNotBlank() }
 
     Box(
         modifier = modifier.background(
@@ -74,28 +75,39 @@ fun WordPackEditScreen(
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.weight(1f),
                 )
-                FilledTonalButton(
+                Button(
                     onClick = {
+                        if (packName.isBlank()) {
+                            showTitleError = true
+                            return@Button
+                        }
+                        showTitleError = false
+
+                        val defaultClue = packName.trim()
                         val validEntries = entries
                             .filter { it.first.isNotBlank() }
-                            .map { Pair(it.first, it.second.takeIf { c -> c.isNotBlank() }) }
+                            .map { (word, clue) ->
+                                val finalClue = if (clue.isNotBlank()) clue.trim() else defaultClue
+                                Pair(word.trim(), finalClue)
+                            }
 
                         if (isEditing) {
-                            gameViewModel.updateWordPack(packId, packName, validEntries)
+                            gameViewModel.updateWordPack(packId, packName.trim(), validEntries)
                         } else {
-                            gameViewModel.saveWordPack(packName, validEntries)
+                            gameViewModel.saveWordPack(packName.trim(), validEntries)
                         }
                         onSaved()
                     },
                     enabled = canSave,
-                    colors = ButtonDefaults.filledTonalButtonColors(
+                    colors = ButtonDefaults.buttonColors(
                         containerColor = SuccessGreen,
                         contentColor = DarkBackground,
                     ),
+                    shape = RoundedCornerShape(12.dp),
                 ) {
-                    Icon(Icons.Default.Save, null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(4.dp))
-                    Text("Save")
+                    Icon(Icons.Default.Save, null, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Save", fontWeight = FontWeight.Bold)
                 }
             }
 
@@ -108,20 +120,32 @@ fun WordPackEditScreen(
                 item {
                     OutlinedTextField(
                         value = packName,
-                        onValueChange = { packName = it },
-                        label = { Text("Category Name") },
-                        placeholder = { Text("e.g. Sports, Music, Custom...") },
+                        onValueChange = {
+                            packName = it
+                            if (it.isNotBlank()) showTitleError = false
+                        },
+                        label = { Text("Category Title *") },
+                        placeholder = { Text("e.g. Anime, Video Games, Sports...") },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
+                        isError = showTitleError,
+                        supportingText = {
+                            if (showTitleError) {
+                                Text("Please enter a title for this word pack!", color = DangerRed, fontWeight = FontWeight.Bold)
+                            } else {
+                                Text("This title will also be used as the default clue for empty clues", color = TextOnDarkSecondary)
+                            }
+                        },
                         shape = RoundedCornerShape(12.dp),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = ImposterPrimary,
                             unfocusedBorderColor = DarkSurfaceVariant,
                             focusedContainerColor = DarkSurfaceVariant.copy(alpha = 0.5f),
                             unfocusedContainerColor = DarkSurfaceVariant.copy(alpha = 0.3f),
+                            errorBorderColor = DangerRed,
                         ),
                     )
-                    Spacer(Modifier.height(16.dp))
+                    Spacer(Modifier.height(12.dp))
                     Text(
                         "Words & Clues",
                         style = MaterialTheme.typography.titleMedium,
@@ -130,7 +154,7 @@ fun WordPackEditScreen(
                     )
                     Spacer(Modifier.height(4.dp))
                     Text(
-                        "Add words to your pack. Clues are optional hints shown to civilians during the game.",
+                        "Add words to your pack. If a clue is left empty, the pack title is used as the default clue.",
                         style = MaterialTheme.typography.bodySmall,
                         color = TextOnDarkSecondary,
                     )
@@ -151,6 +175,7 @@ fun WordPackEditScreen(
                                     style = MaterialTheme.typography.labelMedium,
                                     color = ImposterPrimary,
                                     modifier = Modifier.width(28.dp),
+                                    fontWeight = FontWeight.Bold,
                                 )
                                 OutlinedTextField(
                                     value = word,
@@ -176,7 +201,7 @@ fun WordPackEditScreen(
                                     }
                                 }
                             }
-                            Spacer(Modifier.height(4.dp))
+                            Spacer(Modifier.height(6.dp))
                             OutlinedTextField(
                                 value = clue,
                                 onValueChange = { newClue ->
@@ -184,7 +209,7 @@ fun WordPackEditScreen(
                                         it[index] = Pair(word, newClue)
                                     }
                                 },
-                                placeholder = { Text("Clue (optional)") },
+                                placeholder = { Text(if (packName.isNotBlank()) "Clue (default: ${packName.trim()})" else "Clue (optional)") },
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(start = 28.dp),
@@ -209,7 +234,7 @@ fun WordPackEditScreen(
                     ) {
                         Icon(Icons.Default.Add, null, tint = ImposterSecondary)
                         Spacer(Modifier.width(8.dp))
-                        Text("Add Word", color = ImposterSecondary)
+                        Text("Add Word", color = ImposterSecondary, fontWeight = FontWeight.Bold)
                     }
                 }
             }

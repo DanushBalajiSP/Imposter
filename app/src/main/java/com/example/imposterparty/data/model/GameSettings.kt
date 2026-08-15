@@ -8,9 +8,10 @@ data class GameSettings(
     val manualImposterCount: Int = 1,
     val autoRange: ImposterRange = ImposterRange.ONE_TO_ONE,
     val revealImposterCountAtEnd: Boolean = false,
+    val isTimerEnabled: Boolean = true,
     val timerDuration: TimerDuration = TimerDuration.FIVE_MIN,
     val customTimerSeconds: Int = 300,
-    val selectedCategoryId: Long = -1,
+    val selectedCategoryIds: Set<Long> = emptySet(),
 )
 
 enum class ImposterMode {

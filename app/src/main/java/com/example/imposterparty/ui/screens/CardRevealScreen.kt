@@ -1,7 +1,10 @@
 package com.example.imposterparty.ui.screens
 
+import androidx.compose.animation.*
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -38,6 +41,7 @@ fun CardRevealScreen(
     val gameState by gameViewModel.gameState.collectAsStateWithLifecycle()
     val currentPlayer = gameViewModel.getCurrentRevealPlayer()
     var isRevealing by remember { mutableStateOf(false) }
+    var hasCurrentPlayerOpenedCard by remember(gameState.currentRevealIndex) { mutableStateOf(false) }
     val haptic = LocalHapticFeedback.current
 
     // Watch for phase transition to Discussion
@@ -58,7 +62,7 @@ fun CardRevealScreen(
     val infiniteTransition = rememberInfiniteTransition(label = "pulse")
     val pulseScale by infiniteTransition.animateFloat(
         initialValue = 1f,
-        targetValue = 1.05f,
+        targetValue = 1.04f,
         animationSpec = infiniteRepeatable(
             animation = tween(1000, easing = EaseInOutSine),
             repeatMode = RepeatMode.Reverse,
@@ -79,70 +83,81 @@ fun CardRevealScreen(
             // Progress indicator
             Text(
                 "Player ${gameState.currentRevealIndex + 1} of ${gameState.players.size}",
-                style = MaterialTheme.typography.titleMedium,
-                color = TextOnDarkSecondary,
+                style = MaterialTheme.typography.titleMedium.copy(
+                    fontWeight = FontWeight.ExtraBold,
+                    letterSpacing = 1.sp,
+                ),
+                color = ImposterPrimaryLight,
             )
-            Spacer(Modifier.height(4.dp))
+            Spacer(Modifier.height(8.dp))
             LinearProgressIndicator(
                 progress = { (gameState.currentRevealIndex.toFloat()) / gameState.players.size },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(4.dp)
-                    .clip(RoundedCornerShape(2.dp)),
+                    .height(6.dp)
+                    .clip(RoundedCornerShape(3.dp)),
                 color = ImposterPrimary,
                 trackColor = DarkSurfaceVariant,
             )
 
-            Spacer(Modifier.height(32.dp))
+            Spacer(Modifier.height(28.dp))
 
             if (currentPlayer != null) {
                 // Pass instruction
                 Text(
                     "Pass the phone to",
-                    style = MaterialTheme.typography.bodyLarge,
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontWeight = FontWeight.SemiBold,
+                    ),
                     color = TextOnDarkSecondary,
                 )
+                Spacer(Modifier.height(4.dp))
                 Text(
                     currentPlayer.name,
-                    style = MaterialTheme.typography.headlineLarge,
+                    style = MaterialTheme.typography.displaySmall.copy(
+                        fontWeight = FontWeight.Black,
+                        letterSpacing = 1.sp,
+                    ),
                     color = ImposterSecondary,
-                    fontWeight = FontWeight.Bold,
                 )
 
-                Spacer(Modifier.height(32.dp))
+                Spacer(Modifier.height(28.dp))
 
                 // The Card
+                val cardShape = RoundedCornerShape(26.dp)
+                val isBackSide = rotation > 90f
+
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(280.dp)
+                        .height(300.dp)
                         .scale(if (!isRevealing) pulseScale else 1f)
                         .graphicsLayer {
                             rotationY = rotation
                             cameraDistance = 12f * density
                         }
-                        .clip(RoundedCornerShape(24.dp))
-                        .background(
-                            if (rotation <= 90f) {
-                                Brush.verticalGradient(
-                                    listOf(DarkSurfaceVariant, DarkSurfaceHigh)
-                                )
-                            } else {
-                                if (currentPlayer.role == Role.IMPOSTER) {
-                                    Brush.verticalGradient(
-                                        listOf(DangerRed.copy(alpha = 0.8f), DangerRed.copy(alpha = 0.4f))
-                                    )
+                        .clip(cardShape)
+                        .border(
+                            BorderStroke(
+                                width = if (isBackSide) 3.dp else 1.5.dp,
+                                color = if (isBackSide) {
+                                    if (currentPlayer.role == Role.IMPOSTER) DangerRed else ImposterPrimary
                                 } else {
-                                    Brush.verticalGradient(
-                                        listOf(ImposterPrimary.copy(alpha = 0.6f), ImposterPrimaryDark.copy(alpha = 0.4f))
-                                    )
+                                    DarkSurfaceHigh
                                 }
-                            }
+                            ),
+                            shape = cardShape
                         )
-                        .pointerInput(currentPlayer.id) {
+                        .background(
+                            Brush.verticalGradient(
+                                listOf(DarkSurfaceVariant, DarkSurfaceHigh)
+                            )
+                        )
+                        .pointerInput(currentPlayer.id, gameState.currentRevealIndex) {
                             detectTapGestures(
                                 onPress = {
                                     isRevealing = true
+                                    hasCurrentPlayerOpenedCard = true
                                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                     tryAwaitRelease()
                                     isRevealing = false
@@ -151,21 +166,25 @@ fun CardRevealScreen(
                         },
                     contentAlignment = Alignment.Center,
                 ) {
-                    if (rotation <= 90f) {
+                    if (!isBackSide) {
                         // Card front (hidden)
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("🔒", fontSize = 48.sp)
+                            Text("🔒", fontSize = 52.sp)
                             Spacer(Modifier.height(16.dp))
                             Text(
                                 "Hold to Reveal",
-                                style = MaterialTheme.typography.titleLarge,
+                                style = MaterialTheme.typography.headlineSmall.copy(
+                                    fontWeight = FontWeight.Black,
+                                    letterSpacing = 1.sp,
+                                ),
                                 color = TextOnDark,
-                                fontWeight = FontWeight.Bold,
                             )
-                            Spacer(Modifier.height(4.dp))
+                            Spacer(Modifier.height(6.dp))
                             Text(
-                                "Release to hide",
-                                style = MaterialTheme.typography.bodySmall,
+                                "Keep screen hidden from others",
+                                style = MaterialTheme.typography.bodyMedium.copy(
+                                    fontWeight = FontWeight.SemiBold,
+                                ),
                                 color = TextOnDarkSecondary,
                             )
                         }
@@ -178,50 +197,71 @@ fun CardRevealScreen(
                                 .padding(24.dp),
                         ) {
                             if (currentPlayer.role == Role.IMPOSTER) {
-                                Text("🕵️", fontSize = 48.sp)
-                                Spacer(Modifier.height(12.dp))
+                                Text("🕵️", fontSize = 52.sp)
+                                Spacer(Modifier.height(10.dp))
                                 Text(
                                     "You are the",
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    color = Color.White.copy(alpha = 0.8f),
+                                    style = MaterialTheme.typography.titleMedium.copy(
+                                        fontWeight = FontWeight.Bold,
+                                    ),
+                                    color = TextOnDarkSecondary,
                                 )
                                 Text(
                                     "IMPOSTER",
-                                    style = MaterialTheme.typography.displaySmall,
-                                    color = Color.White,
-                                    fontWeight = FontWeight.Black,
+                                    style = MaterialTheme.typography.displayMedium.copy(
+                                        fontWeight = FontWeight.Black,
+                                        letterSpacing = 3.sp,
+                                    ),
+                                    color = DangerRed,
                                 )
-                                Spacer(Modifier.height(8.dp))
+                                Spacer(Modifier.height(4.dp))
                                 Text(
                                     "You don't know the secret word!",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = Color.White.copy(alpha = 0.7f),
+                                    style = MaterialTheme.typography.bodyMedium.copy(
+                                        fontWeight = FontWeight.Bold,
+                                    ),
+                                    color = TextOnDarkSecondary,
                                     textAlign = TextAlign.Center,
                                 )
+                                // Clue exclusively for imposter
+                                if (!gameState.secretClue.isNullOrBlank()) {
+                                    Spacer(Modifier.height(12.dp))
+                                    Surface(
+                                        color = DangerRed.copy(alpha = 0.2f),
+                                        shape = RoundedCornerShape(10.dp),
+                                        border = BorderStroke(1.5.dp, DangerRed.copy(alpha = 0.5f))
+                                    ) {
+                                        Text(
+                                            "💡 Clue: ${gameState.secretClue}",
+                                            style = MaterialTheme.typography.bodyLarge.copy(
+                                                fontWeight = FontWeight.Black,
+                                            ),
+                                            color = WarningYellow,
+                                            textAlign = TextAlign.Center,
+                                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                                        )
+                                    }
+                                }
                             } else {
-                                Text("✅", fontSize = 48.sp)
-                                Spacer(Modifier.height(12.dp))
+                                Text("✅", fontSize = 52.sp)
+                                Spacer(Modifier.height(10.dp))
                                 Text(
                                     "The secret word is",
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    color = Color.White.copy(alpha = 0.8f),
+                                    style = MaterialTheme.typography.titleMedium.copy(
+                                        fontWeight = FontWeight.Bold,
+                                    ),
+                                    color = TextOnDarkSecondary,
                                 )
+                                Spacer(Modifier.height(4.dp))
                                 Text(
                                     gameState.secretWord,
-                                    style = MaterialTheme.typography.displaySmall,
-                                    color = Color.White,
-                                    fontWeight = FontWeight.Black,
+                                    style = MaterialTheme.typography.displayMedium.copy(
+                                        fontWeight = FontWeight.Black,
+                                        letterSpacing = 1.sp,
+                                    ),
+                                    color = ImposterSecondary,
                                     textAlign = TextAlign.Center,
                                 )
-                                if (!gameState.secretClue.isNullOrBlank()) {
-                                    Spacer(Modifier.height(8.dp))
-                                    Text(
-                                        "💡 Clue: ${gameState.secretClue}",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = WarningYellow.copy(alpha = 0.9f),
-                                        textAlign = TextAlign.Center,
-                                    )
-                                }
                             }
                         }
                     }
@@ -229,25 +269,49 @@ fun CardRevealScreen(
 
                 Spacer(Modifier.height(32.dp))
 
-                // Next Player button
-                Button(
-                    onClick = {
-                        isRevealing = false
-                        gameViewModel.markCurrentPlayerRevealed()
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(52.dp),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = ImposterPrimary),
+                // Next Player button (Shown ONLY after the current player has opened their card at least once)
+                AnimatedVisibility(
+                    visible = hasCurrentPlayerOpenedCard,
+                    enter = fadeIn() + expandVertically(),
+                    exit = fadeOut() + shrinkVertically(),
+                ) {
+                    Button(
+                        onClick = {
+                            isRevealing = false
+                            gameViewModel.markCurrentPlayerRevealed()
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(58.dp),
+                        shape = RoundedCornerShape(18.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = ImposterPrimary),
+                        border = BorderStroke(1.5.dp, Color.White.copy(alpha = 0.3f)),
+                    ) {
+                        Text(
+                            if (gameState.currentRevealIndex >= gameState.players.size - 1)
+                                "Start Discussion" else "Next Player",
+                            fontWeight = FontWeight.Black,
+                            style = MaterialTheme.typography.titleMedium,
+                            color = Color.White,
+                        )
+                        Spacer(Modifier.width(10.dp))
+                        Icon(Icons.AutoMirrored.Filled.ArrowForward, null, modifier = Modifier.size(22.dp))
+                    }
+                }
+
+                AnimatedVisibility(
+                    visible = !hasCurrentPlayerOpenedCard,
+                    enter = fadeIn(),
+                    exit = fadeOut(),
                 ) {
                     Text(
-                        if (gameState.currentRevealIndex >= gameState.players.size - 1)
-                            "Start Discussion" else "Next Player",
-                        fontWeight = FontWeight.Bold,
+                        "👆 Press and hold the card above to reveal your role",
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            fontWeight = FontWeight.ExtraBold,
+                        ),
+                        color = WarningYellow,
+                        textAlign = TextAlign.Center,
                     )
-                    Spacer(Modifier.width(8.dp))
-                    Icon(Icons.AutoMirrored.Filled.ArrowForward, null)
                 }
             }
         }

@@ -13,7 +13,15 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
 
     private val dataManager = LocalDataManager(application)
 
-    private val _gameState = MutableStateFlow(GameState())
+    private fun defaultPlayers(): List<Player> = listOf(
+        Player(id = 0, name = "Player 1"),
+        Player(id = 1, name = "Player 2"),
+        Player(id = 2, name = "Player 3"),
+    )
+
+    private var currentMatchId: Long = System.currentTimeMillis()
+
+    private val _gameState = MutableStateFlow(GameState(players = defaultPlayers()))
     val gameState: StateFlow<GameState> = _gameState.asStateFlow()
 
     val wordPacks = dataManager.allPacks
@@ -25,6 +33,15 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     val allScores = dataManager.allScores
         .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
+    val allHistory = dataManager.allHistory
+        .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
+    val allMatches = dataManager.allMatches
+        .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
+    val activeMatch = dataManager.activeMatch
+        .stateIn(viewModelScope, SharingStarted.Lazily, null)
+
     private var countDownTimer: CountDownTimer? = null
 
     // Accumulated scores across rounds in the current session
@@ -34,6 +51,35 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     init {
         viewModelScope.launch {
             dataManager.initialize()
+            val savedInProgressState = dataManager.loadActiveGameState()
+            if (savedInProgressState != null && savedInProgressState.phase != GamePhase.SETUP) {
+                _gameState.value = savedInProgressState
+                if (savedInProgressState.phase == GamePhase.DISCUSSION &&
+                    savedInProgressState.settings.isTimerEnabled &&
+                    savedInProgressState.timerRemainingSeconds > 0
+                ) {
+                    startTimer()
+                }
+            } else {
+                val savedNames = dataManager.lastPlayerNames.first()
+                if (savedNames.isNotEmpty()) {
+                    val finalNames = if (savedNames.size < 3) {
+                        val m = savedNames.toMutableList()
+                        while (m.size < 3) m.add("Player ${m.size + 1}")
+                        m
+                    } else savedNames
+                    val players = finalNames.mapIndexed { index, name ->
+                        Player(id = index, name = name)
+                    }
+                    _gameState.update { it.copy(players = players) }
+                }
+            }
+        }
+    }
+
+    private fun persistCurrentState(state: GameState) {
+        viewModelScope.launch {
+            dataManager.saveActiveGameState(state)
         }
     }
 
@@ -44,10 +90,58 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun setPlayerNames(names: List<String>) {
-        val players = names.mapIndexed { index, name ->
+        val finalNames = if (names.isEmpty()) {
+            listOf("Player 1", "Player 2", "Player 3")
+        } else {
+            names.mapIndexed { index, name ->
+                if (name.isBlank()) "Player ${index + 1}" else name.trim()
+            }
+        }
+        val players = finalNames.mapIndexed { index, name ->
             Player(id = index, name = name)
         }
         _gameState.update { it.copy(players = players) }
+        viewModelScope.launch {
+            dataManager.saveLastPlayerNames(finalNames)
+        }
+    }
+
+    // ── Resume / New Match ─────────────────────────────────
+
+    fun startNewGame() {
+        countDownTimer?.cancel()
+        currentMatchId = System.currentTimeMillis()
+        _sessionScores.value = emptyMap()
+        val currentPlayers = _gameState.value.players
+        val playerList = if (currentPlayers.isNotEmpty() && currentPlayers.size >= 3) {
+            currentPlayers.mapIndexed { index, p ->
+                p.copy(id = index, role = Role.CIVILIAN, hasRevealed = false, hasVoted = false, votedForId = null)
+            }
+        } else defaultPlayers()
+
+        val newState = GameState(
+            players = playerList,
+            roundNumber = 1,
+            settings = _gameState.value.settings
+        )
+        _gameState.value = newState
+        persistCurrentState(newState)
+    }
+
+    fun resumeMatch(match: MatchSession) {
+        countDownTimer?.cancel()
+        currentMatchId = match.id
+        _sessionScores.value = match.cumulativeScores
+        val restoredPlayers = match.playerNames.mapIndexed { index, name ->
+            Player(id = index, name = name, role = Role.CIVILIAN, hasRevealed = false, hasVoted = false)
+        }
+        val newState = GameState(
+            players = restoredPlayers,
+            roundNumber = match.totalRounds + 1,
+            settings = match.settings
+        )
+        _gameState.value = newState
+        persistCurrentState(newState)
     }
 
     // ── Start Game ─────────────────────────────────────────
@@ -56,9 +150,23 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             val state = _gameState.value
             val settings = state.settings
-            val players = state.players
+            var players = state.players
 
-            if (players.size < 3) return@launch
+            // Ensure at least 3 players
+            if (players.size < 3) {
+                val names = players.map { it.name }.toMutableList()
+                while (names.size < 3) {
+                    names.add("Player ${names.size + 1}")
+                }
+                players = names.mapIndexed { index, name ->
+                    Player(id = index, name = if (name.isBlank()) "Player ${index + 1}" else name.trim())
+                }
+            } else {
+                // Ensure no empty names
+                players = players.mapIndexed { index, player ->
+                    player.copy(name = if (player.name.isBlank()) "Player ${index + 1}" else player.name.trim())
+                }
+            }
 
             // Determine imposter count
             val imposterCount = when (settings.imposterMode) {
@@ -70,24 +178,24 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
 
-            // Pick a random word from the selected category
-            val entries = if (settings.selectedCategoryId > 0) {
-                dataManager.getEntriesForPackOnce(settings.selectedCategoryId)
+            // Pick a random word from selected categories (or all categories if none selected)
+            val entries = if (settings.selectedCategoryIds.isNotEmpty()) {
+                val selectedEntries = settings.selectedCategoryIds.flatMap { packId ->
+                    dataManager.getEntriesForPackOnce(packId)
+                }
+                if (selectedEntries.isNotEmpty()) selectedEntries else {
+                    val packs = wordPacks.value
+                    packs.flatMap { dataManager.getEntriesForPackOnce(it.id) }
+                }
             } else {
                 val packs = wordPacks.value
-                if (packs.isNotEmpty()) {
-                    dataManager.getEntriesForPackOnce(packs.random().id)
-                } else {
-                    emptyList()
-                }
+                packs.flatMap { dataManager.getEntriesForPackOnce(it.id) }
             }
 
             if (entries.isEmpty()) return@launch
 
             val selectedEntry = entries.random()
-            val categoryName = if (settings.selectedCategoryId > 0) {
-                dataManager.getPackById(settings.selectedCategoryId)?.name ?: ""
-            } else ""
+            val categoryName = dataManager.getPackById(selectedEntry.packId)?.name ?: ""
 
             // Assign roles
             val shuffledIndices = players.indices.shuffled()
@@ -102,39 +210,41 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 )
             }
 
-            // Shuffle reveal order
-            val revealOrder = assignedPlayers.indices.shuffled()
+            // Card reveal order: Keep SAME order as initially given in the Lobby (0, 1, 2, ...)
+            val revealOrder = assignedPlayers.indices.toList()
 
-            // Discussion order: random start, then round-robin
-            val startIndex = players.indices.random()
-            val discussionOrder = (startIndex until startIndex + players.size).map { it % players.size }
+            // Randomly select ONE person who should start the conversation
+            val startingSpeakerIndex = assignedPlayers.indices.random()
 
             // Timer
-            val timerSeconds = when (settings.timerDuration) {
-                TimerDuration.CUSTOM -> settings.customTimerSeconds
-                else -> settings.timerDuration.seconds
+            val timerSeconds = if (settings.isTimerEnabled) {
+                when (settings.timerDuration) {
+                    TimerDuration.CUSTOM -> settings.customTimerSeconds
+                    else -> settings.timerDuration.seconds
+                }
+            } else {
+                0
             }
 
-            _gameState.update {
-                it.copy(
-                    phase = GamePhase.REVEALING,
-                    players = assignedPlayers,
-                    secretWord = selectedEntry.word,
-                    secretClue = selectedEntry.clue,
-                    categoryName = categoryName,
-                    currentRevealIndex = 0,
-                    revealOrder = revealOrder,
-                    discussionOrder = discussionOrder,
-                    currentSpeakerIndex = 0,
-                    timerRemainingSeconds = timerSeconds,
-                    isTimerRunning = false,
-                    currentVoterIndex = 0,
-                    votes = emptyMap(),
-                    actualImposterCount = imposterCount,
-                    accusedPlayerId = null,
-                    isImposterFound = false,
-                )
-            }
+            val newState = state.copy(
+                phase = GamePhase.REVEALING,
+                players = assignedPlayers,
+                secretWord = selectedEntry.word,
+                secretClue = selectedEntry.clue,
+                categoryName = categoryName,
+                currentRevealIndex = 0,
+                revealOrder = revealOrder,
+                startingSpeakerIndex = startingSpeakerIndex,
+                timerRemainingSeconds = timerSeconds,
+                isTimerRunning = false,
+                currentVoterIndex = 0,
+                votes = emptyMap(),
+                actualImposterCount = imposterCount,
+                accusedPlayerId = null,
+                isImposterFound = false,
+            )
+            _gameState.value = newState
+            persistCurrentState(newState)
         }
     }
 
@@ -154,15 +264,15 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         val nextIndex = currentIdx + 1
         val allRevealed = nextIndex >= revealOrder.size
 
-        _gameState.update {
-            it.copy(
-                players = updatedPlayers,
-                currentRevealIndex = nextIndex,
-                phase = if (allRevealed) GamePhase.DISCUSSION else GamePhase.REVEALING,
-            )
-        }
+        val newState = state.copy(
+            players = updatedPlayers,
+            currentRevealIndex = nextIndex,
+            phase = if (allRevealed) GamePhase.DISCUSSION else GamePhase.REVEALING,
+        )
+        _gameState.value = newState
+        persistCurrentState(newState)
 
-        if (allRevealed) {
+        if (allRevealed && state.settings.isTimerEnabled) {
             startTimer()
         }
     }
@@ -201,23 +311,15 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         }.start()
     }
 
-    fun advanceSpeaker() {
-        val state = _gameState.value
-        val nextSpeaker = state.currentSpeakerIndex + 1
-        if (nextSpeaker < state.discussionOrder.size) {
-            _gameState.update { it.copy(currentSpeakerIndex = nextSpeaker) }
-        }
-    }
-
     fun endDiscussion() {
         countDownTimer?.cancel()
-        _gameState.update {
-            it.copy(
-                phase = GamePhase.VOTING,
-                isTimerRunning = false,
-                currentVoterIndex = 0,
-            )
-        }
+        val newState = _gameState.value.copy(
+            phase = GamePhase.VOTING,
+            isTimerRunning = false,
+            currentVoterIndex = 0,
+        )
+        _gameState.value = newState
+        persistCurrentState(newState)
     }
 
     // ── Voting Phase ───────────────────────────────────────
@@ -243,13 +345,13 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         val nextVoterIndex = voterIndex + 1
         val allVoted = nextVoterIndex >= state.players.size
 
-        _gameState.update {
-            it.copy(
-                players = updatedPlayers,
-                votes = updatedVotes,
-                currentVoterIndex = nextVoterIndex,
-            )
-        }
+        val newState = state.copy(
+            players = updatedPlayers,
+            votes = updatedVotes,
+            currentVoterIndex = nextVoterIndex,
+        )
+        _gameState.value = newState
+        persistCurrentState(newState)
 
         if (allVoted) {
             tallyVotes()
@@ -270,21 +372,23 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         val accusedPlayer = state.players.find { it.id == accusedId }
         val isImposterFound = accusedPlayer?.role == Role.IMPOSTER
 
-        _gameState.update {
-            it.copy(
-                phase = GamePhase.RESULT,
-                accusedPlayerId = accusedId,
-                isImposterFound = isImposterFound,
-            )
-        }
+        val newState = state.copy(
+            phase = GamePhase.RESULT,
+            accusedPlayerId = accusedId,
+            isImposterFound = isImposterFound,
+        )
+        _gameState.value = newState
+        persistCurrentState(newState)
 
-        // Save scores
+        // Save scores and game history locally
         saveRoundScores(isImposterFound)
     }
 
     private fun saveRoundScores(isImposterFound: Boolean) {
         viewModelScope.launch {
             val state = _gameState.value
+            val roundScoresMap = mutableMapOf<String, Int>()
+
             val scoreRecords = state.players.map { player ->
                 val isImposter = player.role == Role.IMPOSTER
                 val points = if (isImposterFound) {
@@ -292,6 +396,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 } else {
                     if (isImposter) 1 else 0
                 }
+                roundScoresMap[player.name] = points
 
                 // Update session scores
                 _sessionScores.update { scores ->
@@ -305,9 +410,43 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                     roundNumber = state.roundNumber,
                     wasImposter = isImposter,
                     won = if (isImposter) !isImposterFound else isImposterFound,
+                    secretWord = state.secretWord,
+                    categoryName = state.categoryName,
                 )
             }
-            dataManager.saveScores(scoreRecords)
+
+            val historyRecord = GameHistoryRecord(
+                id = System.currentTimeMillis(),
+                timestamp = System.currentTimeMillis(),
+                roundNumber = state.roundNumber,
+                categoryName = state.categoryName,
+                secretWord = state.secretWord,
+                secretClue = state.secretClue,
+                imposterNames = state.players.filter { it.role == Role.IMPOSTER }.map { it.name },
+                civilianNames = state.players.filter { it.role == Role.CIVILIAN }.map { it.name },
+                accusedPlayerName = state.players.find { it.id == state.accusedPlayerId }?.name,
+                isImposterFound = isImposterFound,
+                scores = roundScoresMap,
+            )
+
+            // Save match session
+            val existingMatches = dataManager.allMatches.first()
+            val currentMatch = existingMatches.find { it.id == currentMatchId }
+
+            val updatedMatch = MatchSession(
+                id = currentMatchId,
+                createdAt = currentMatch?.createdAt ?: System.currentTimeMillis(),
+                lastPlayedAt = System.currentTimeMillis(),
+                totalRounds = state.roundNumber,
+                playerNames = state.players.map { it.name },
+                cumulativeScores = _sessionScores.value,
+                rounds = (currentMatch?.rounds ?: emptyList()) + historyRecord,
+                settings = state.settings,
+            )
+
+            dataManager.saveScoresAndHistory(scoreRecords, historyRecord)
+            dataManager.saveMatchSession(updatedMatch)
+            dataManager.saveLastPlayerNames(state.players.map { it.name })
         }
     }
 
@@ -315,35 +454,67 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
 
     fun nextRound() {
         val state = _gameState.value
-        _gameState.update {
-            it.copy(
-                phase = GamePhase.SETUP,
-                roundNumber = state.roundNumber + 1,
-                secretWord = "",
-                secretClue = null,
-                accusedPlayerId = null,
-                isImposterFound = false,
-                votes = emptyMap(),
-                currentRevealIndex = 0,
-                currentVoterIndex = 0,
-                currentSpeakerIndex = 0,
-                isTimerRunning = false,
-                players = state.players.map {
-                    p -> p.copy(role = Role.CIVILIAN, hasRevealed = false, hasVoted = false, votedForId = null)
-                },
-            )
-        }
+        val newState = state.copy(
+            phase = GamePhase.SETUP,
+            roundNumber = state.roundNumber + 1,
+            secretWord = "",
+            secretClue = null,
+            accusedPlayerId = null,
+            isImposterFound = false,
+            votes = emptyMap(),
+            currentRevealIndex = 0,
+            currentVoterIndex = 0,
+            startingSpeakerIndex = 0,
+            isTimerRunning = false,
+            players = state.players.map {
+                p -> p.copy(role = Role.CIVILIAN, hasRevealed = false, hasVoted = false, votedForId = null)
+            },
+        )
+        _gameState.value = newState
+        persistCurrentState(newState)
     }
 
     fun resetGame() {
         countDownTimer?.cancel()
-        _gameState.value = GameState()
-        _sessionScores.value = emptyMap()
+        val newState = _gameState.value.copy(
+            phase = GamePhase.SETUP,
+            secretWord = "",
+            secretClue = null,
+            accusedPlayerId = null,
+            isImposterFound = false,
+            votes = emptyMap(),
+            currentRevealIndex = 0,
+            currentVoterIndex = 0,
+            startingSpeakerIndex = 0,
+            isTimerRunning = false,
+            players = _gameState.value.players.map { p ->
+                p.copy(role = Role.CIVILIAN, hasRevealed = false, hasVoted = false, votedForId = null)
+            }
+        )
+        _gameState.value = newState
+        persistCurrentState(newState)
+    }
+
+    fun deletePlayerScores(playerName: String) {
+        viewModelScope.launch {
+            dataManager.deletePlayerScores(playerName)
+        }
+    }
+
+    fun deleteMatchSession(matchId: Long) {
+        viewModelScope.launch {
+            dataManager.deleteMatchSession(matchId)
+            if (currentMatchId == matchId) {
+                _sessionScores.value = emptyMap()
+                currentMatchId = System.currentTimeMillis()
+            }
+        }
     }
 
     fun clearScoreHistory() {
         viewModelScope.launch {
             dataManager.clearAllScores()
+            _sessionScores.value = emptyMap()
         }
     }
 

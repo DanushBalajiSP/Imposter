@@ -1,7 +1,9 @@
 package com.example.imposterparty.ui.screens
 
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -52,7 +54,7 @@ fun ResultScreen(
     val infiniteTransition = rememberInfiniteTransition(label = "resultPulse")
     val pulseScale by infiniteTransition.animateFloat(
         initialValue = 1f,
-        targetValue = 1.1f,
+        targetValue = 1.12f,
         animationSpec = infiniteRepeatable(
             animation = tween(800, easing = EaseInOutSine),
             repeatMode = RepeatMode.Reverse,
@@ -64,9 +66,9 @@ fun ResultScreen(
         modifier = modifier.background(
             Brush.verticalGradient(
                 if (gameState.isImposterFound)
-                    listOf(DarkBackground, SuccessGreen.copy(alpha = 0.1f), DarkBackground)
+                    listOf(DarkBackground, SuccessGreen.copy(alpha = 0.15f), DarkBackground)
                 else
-                    listOf(DarkBackground, DangerRed.copy(alpha = 0.1f), DarkBackground)
+                    listOf(DarkBackground, DangerRed.copy(alpha = 0.15f), DarkBackground)
             )
         ),
     ) {
@@ -83,17 +85,19 @@ fun ResultScreen(
 
                 Text(
                     if (gameState.isImposterFound) "🎉" else "😈",
-                    fontSize = 64.sp,
+                    fontSize = 68.sp,
                     modifier = Modifier.scale(pulseScale),
                 )
 
-                Spacer(Modifier.height(16.dp))
+                Spacer(Modifier.height(14.dp))
 
                 Text(
-                    if (gameState.isImposterFound) "IMPOSTER FOUND!" else "IMPOSTERS WIN!",
-                    style = MaterialTheme.typography.headlineLarge,
+                    if (gameState.isImposterFound) "CIVILIANS WIN!" else "IMPOSTERS WIN!",
+                    style = MaterialTheme.typography.headlineLarge.copy(
+                        fontWeight = FontWeight.Black,
+                        letterSpacing = 2.sp,
+                    ),
                     color = if (gameState.isImposterFound) SuccessGreen else DangerRed,
-                    fontWeight = FontWeight.Black,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.scale(animScale),
                 )
@@ -101,22 +105,32 @@ fun ResultScreen(
                 Spacer(Modifier.height(8.dp))
 
                 if (accusedPlayer != null) {
-                    Text(
-                        "${accusedPlayer.name} was accused",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = TextOnDarkSecondary,
-                    )
+                    Surface(
+                        color = DarkSurfaceHigh,
+                        shape = RoundedCornerShape(10.dp),
+                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.15f))
+                    ) {
+                        Text(
+                            "Accused: ${accusedPlayer.name}",
+                            style = MaterialTheme.typography.titleMedium.copy(
+                                fontWeight = FontWeight.ExtraBold,
+                            ),
+                            color = TextOnDark,
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
+                        )
+                    }
                 }
 
-                Spacer(Modifier.height(24.dp))
+                Spacer(Modifier.height(20.dp))
             }
 
             // Secret word reveal
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = DarkSurfaceVariant.copy(alpha = 0.7f)),
-                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = DarkSurfaceVariant.copy(alpha = 0.8f)),
+                    shape = RoundedCornerShape(18.dp),
+                    border = BorderStroke(1.5.dp, ImposterSecondary.copy(alpha = 0.4f)),
                 ) {
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
@@ -126,14 +140,19 @@ fun ResultScreen(
                     ) {
                         Text(
                             "The Secret Word",
-                            style = MaterialTheme.typography.bodyMedium,
+                            style = MaterialTheme.typography.titleSmall.copy(
+                                fontWeight = FontWeight.Bold,
+                            ),
                             color = TextOnDarkSecondary,
                         )
+                        Spacer(Modifier.height(4.dp))
                         Text(
                             gameState.secretWord,
-                            style = MaterialTheme.typography.headlineMedium,
+                            style = MaterialTheme.typography.headlineMedium.copy(
+                                fontWeight = FontWeight.Black,
+                                letterSpacing = 1.sp,
+                            ),
                             color = ImposterSecondary,
-                            fontWeight = FontWeight.Bold,
                         )
                     }
                 }
@@ -146,25 +165,29 @@ fun ResultScreen(
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(containerColor = DangerRed.copy(alpha = 0.15f)),
-                    shape = RoundedCornerShape(16.dp),
+                    shape = RoundedCornerShape(18.dp),
+                    border = BorderStroke(1.5.dp, DangerRed.copy(alpha = 0.4f)),
                 ) {
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(16.dp),
+                            .padding(18.dp),
                     ) {
                         Text(
                             "🕵️ The Imposter${if (imposters.size > 1) "s" else ""} ${if (imposters.size > 1) "were" else "was"}",
-                            style = MaterialTheme.typography.bodyMedium,
+                            style = MaterialTheme.typography.titleSmall.copy(
+                                fontWeight = FontWeight.Bold,
+                            ),
                             color = TextOnDarkSecondary,
                         )
-                        Spacer(Modifier.height(4.dp))
+                        Spacer(Modifier.height(6.dp))
                         imposters.forEach { imposter ->
                             Text(
                                 imposter.name,
-                                style = MaterialTheme.typography.titleLarge,
+                                style = MaterialTheme.typography.headlineSmall.copy(
+                                    fontWeight = FontWeight.Black,
+                                ),
                                 color = DangerRed,
-                                fontWeight = FontWeight.Bold,
                             )
                         }
 
@@ -176,48 +199,52 @@ fun ResultScreen(
                             Spacer(Modifier.height(8.dp))
                             Text(
                                 "There ${if (gameState.actualImposterCount == 1) "was" else "were"} ${gameState.actualImposterCount} imposter${if (gameState.actualImposterCount > 1) "s" else ""} this round",
-                                style = MaterialTheme.typography.bodySmall,
+                                style = MaterialTheme.typography.bodyMedium.copy(
+                                    fontWeight = FontWeight.ExtraBold,
+                                ),
                                 color = WarningYellow,
                             )
                         }
                     }
                 }
 
-                Spacer(Modifier.height(16.dp))
+                Spacer(Modifier.height(20.dp))
             }
 
             // Scoring
             item {
                 Text(
                     "📊 Round ${gameState.roundNumber} Scores",
-                    style = MaterialTheme.typography.titleMedium,
+                    style = MaterialTheme.typography.titleLarge.copy(
+                        fontWeight = FontWeight.Black,
+                    ),
                     color = TextOnDark,
-                    fontWeight = FontWeight.Bold,
                 )
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(10.dp))
             }
 
             // Score table
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = DarkSurfaceVariant.copy(alpha = 0.5f)),
-                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = DarkSurfaceVariant.copy(alpha = 0.6f)),
+                    shape = RoundedCornerShape(18.dp),
+                    border = BorderStroke(1.dp, DarkSurfaceHigh),
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         // Header
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(bottom = 8.dp),
+                                .padding(bottom = 10.dp),
                         ) {
-                            Text("Player", color = TextOnDarkSecondary, modifier = Modifier.weight(1f), style = MaterialTheme.typography.labelMedium)
-                            Text("Role", color = TextOnDarkSecondary, modifier = Modifier.width(80.dp), textAlign = TextAlign.Center, style = MaterialTheme.typography.labelMedium)
-                            Text("Pts", color = TextOnDarkSecondary, modifier = Modifier.width(40.dp), textAlign = TextAlign.Center, style = MaterialTheme.typography.labelMedium)
-                            Text("Total", color = TextOnDarkSecondary, modifier = Modifier.width(50.dp), textAlign = TextAlign.Center, style = MaterialTheme.typography.labelMedium)
+                            Text("Player", color = TextOnDarkSecondary, modifier = Modifier.weight(1f), style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold))
+                            Text("Role", color = TextOnDarkSecondary, modifier = Modifier.width(84.dp), textAlign = TextAlign.Center, style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold))
+                            Text("Pts", color = TextOnDarkSecondary, modifier = Modifier.width(44.dp), textAlign = TextAlign.Center, style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold))
+                            Text("Total", color = TextOnDarkSecondary, modifier = Modifier.width(54.dp), textAlign = TextAlign.Center, style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold))
                         }
 
-                        HorizontalDivider(color = DarkSurfaceHigh)
+                        HorizontalDivider(color = DarkSurfaceHigh, thickness = 1.5.dp)
 
                         gameState.players.forEach { player ->
                             val isImposter = player.role == Role.IMPOSTER
@@ -232,48 +259,59 @@ fun ResultScreen(
                                 verticalAlignment = Alignment.CenterVertically,
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(vertical = 6.dp),
+                                    .padding(vertical = 8.dp),
                             ) {
                                 Text(
                                     player.name,
                                     color = TextOnDark,
                                     modifier = Modifier.weight(1f),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = FontWeight.Medium,
+                                    style = MaterialTheme.typography.bodyLarge.copy(
+                                        fontWeight = FontWeight.Bold,
+                                    ),
                                 )
                                 Box(
                                     modifier = Modifier
-                                        .width(80.dp)
+                                        .width(84.dp)
                                         .clip(RoundedCornerShape(8.dp))
                                         .background(
-                                            if (isImposter) DangerRed.copy(alpha = 0.2f)
-                                            else SuccessGreen.copy(alpha = 0.2f)
+                                            if (isImposter) DangerRed.copy(alpha = 0.25f)
+                                            else SuccessGreen.copy(alpha = 0.25f)
                                         )
-                                        .padding(vertical = 2.dp),
+                                        .border(
+                                            BorderStroke(
+                                                1.dp,
+                                                if (isImposter) DangerRed.copy(alpha = 0.6f) else SuccessGreen.copy(alpha = 0.6f)
+                                            ),
+                                            shape = RoundedCornerShape(8.dp)
+                                        )
+                                        .padding(vertical = 4.dp),
                                     contentAlignment = Alignment.Center,
                                 ) {
                                     Text(
                                         if (isImposter) "Imposter" else "Civilian",
-                                        style = MaterialTheme.typography.labelSmall,
+                                        style = MaterialTheme.typography.labelMedium.copy(
+                                            fontWeight = FontWeight.Black,
+                                        ),
                                         color = if (isImposter) DangerRed else SuccessGreen,
-                                        fontWeight = FontWeight.Bold,
                                     )
                                 }
                                 Text(
                                     "+$roundPoints",
                                     color = if (roundPoints > 0) SuccessGreen else TextOnDarkSecondary,
-                                    modifier = Modifier.width(40.dp),
+                                    modifier = Modifier.width(44.dp),
                                     textAlign = TextAlign.Center,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = FontWeight.Bold,
+                                    style = MaterialTheme.typography.titleMedium.copy(
+                                        fontWeight = FontWeight.Black,
+                                    ),
                                 )
                                 Text(
                                     "$totalPoints",
                                     color = ImposterSecondary,
-                                    modifier = Modifier.width(50.dp),
+                                    modifier = Modifier.width(54.dp),
                                     textAlign = TextAlign.Center,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = FontWeight.Bold,
+                                    style = MaterialTheme.typography.titleMedium.copy(
+                                        fontWeight = FontWeight.Black,
+                                    ),
                                 )
                             }
                         }
@@ -293,25 +331,36 @@ fun ResultScreen(
                         onClick = onHome,
                         modifier = Modifier
                             .weight(1f)
-                            .height(52.dp),
-                        shape = RoundedCornerShape(16.dp),
+                            .height(56.dp),
+                        shape = RoundedCornerShape(18.dp),
+                        border = BorderStroke(1.5.dp, DarkSurfaceHigh),
                     ) {
-                        Icon(Icons.Default.Home, null, modifier = Modifier.size(18.dp))
+                        Icon(Icons.Default.Home, null, modifier = Modifier.size(20.dp))
                         Spacer(Modifier.width(8.dp))
-                        Text("Home", fontWeight = FontWeight.Bold)
+                        Text(
+                            "Home",
+                            fontWeight = FontWeight.Black,
+                            style = MaterialTheme.typography.titleSmall,
+                        )
                     }
 
                     Button(
                         onClick = onNextRound,
                         modifier = Modifier
                             .weight(1f)
-                            .height(52.dp),
-                        shape = RoundedCornerShape(16.dp),
+                            .height(56.dp),
+                        shape = RoundedCornerShape(18.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = ImposterPrimary),
+                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.3f)),
                     ) {
-                        Icon(Icons.Default.Replay, null, modifier = Modifier.size(18.dp))
+                        Icon(Icons.Default.Replay, null, modifier = Modifier.size(20.dp))
                         Spacer(Modifier.width(8.dp))
-                        Text("Next Round", fontWeight = FontWeight.Bold)
+                        Text(
+                            "Next Round",
+                            fontWeight = FontWeight.Black,
+                            style = MaterialTheme.typography.titleMedium,
+                            color = Color.White,
+                        )
                     }
                 }
             }

@@ -1,30 +1,105 @@
 {
   "name": "🌍 Places",
   "words": [
-    {"word": "Eiffel Tower", "clue": "Paris landmark"},
-    {"word": "Taj Mahal", "clue": "White marble mausoleum"},
-    {"word": "Great Wall", "clue": "Chinese fortification"},
-    {"word": "Pyramids", "clue": "Egyptian tombs"},
-    {"word": "Statue of Liberty", "clue": "NYC green lady"},
-    {"word": "Colosseum", "clue": "Roman arena"},
-    {"word": "Machu Picchu", "clue": "Incan city"},
-    {"word": "Mount Everest", "clue": "Tallest mountain"},
-    {"word": "Amazon Rainforest", "clue": "Largest jungle"},
-    {"word": "Niagara Falls", "clue": "Famous waterfall"},
-    {"word": "Sahara Desert", "clue": "Largest hot desert"},
-    {"word": "Big Ben", "clue": "London clock tower"},
-    {"word": "Hollywood", "clue": "Film capital"},
-    {"word": "Venice", "clue": "City of canals"},
-    {"word": "Tokyo", "clue": "Japan's capital"},
-    {"word": "Dubai", "clue": "Tallest buildings"},
-    {"word": "Antarctica", "clue": "Frozen continent"},
-    {"word": "Hawaii", "clue": "Volcanic islands"},
-    {"word": "Bermuda Triangle", "clue": "Mysterious waters"},
-    {"word": "Grand Canyon", "clue": "Deep gorge"},
-    {"word": "Sydney Opera House", "clue": "Australian icon"},
-    {"word": "Stonehenge", "clue": "Ancient stone circle"},
-    {"word": "Mars", "clue": "Red planet"},
-    {"word": "North Pole", "clue": "Santa's home"},
-    {"word": "Silicon Valley", "clue": "Tech hub"}
+    {
+      "word": "Eiffel Tower",
+      "clue": "Places & Country"
+    },
+    {
+      "word": "Taj Mahal",
+      "clue": "Places & Country"
+    },
+    {
+      "word": "Great Wall",
+      "clue": "Places & Country"
+    },
+    {
+      "word": "Pyramids",
+      "clue": "Places & Country"
+    },
+    {
+      "word": "Statue of Liberty",
+      "clue": "Places & Country"
+    },
+    {
+      "word": "Colosseum",
+      "clue": "Places & Country"
+    },
+    {
+      "word": "Machu Picchu",
+      "clue": "Places & Country"
+    },
+    {
+      "word": "Mount Everest",
+      "clue": "Places & Country"
+    },
+    {
+      "word": "Amazon Rainforest",
+      "clue": "Places & Country"
+    },
+    {
+      "word": "Niagara Falls",
+      "clue": "Places & Country"
+    },
+    {
+      "word": "Sahara Desert",
+      "clue": "Places & Country"
+    },
+    {
+      "word": "Marina Beach",
+      "clue": "Places & Country"
+    },
+    {
+      "word": "Hollywood",
+      "clue": "Places & Country"
+    },
+    {
+      "word": "Venice",
+      "clue": "Places & Country"
+    },
+    {
+      "word": "Tokyo",
+      "clue": "Places & Country"
+    },
+    {
+      "word": "Dubai",
+      "clue": "Places & Country"
+    },
+    {
+      "word": "Antarctica",
+      "clue": "Places & Country"
+    },
+    {
+      "word": "Hawaii",
+      "clue": "Places & Country"
+    },
+    {
+      "word": "Bermuda Triangle",
+      "clue": "Places & Country"
+    },
+    {
+      "word": "Grand Canyon",
+      "clue": "Places & Country"
+    },
+    {
+      "word": "Mahabalipuram",
+      "clue": "Places & Country"
+    },
+    {
+      "word": "Thanjavur",
+      "clue": "Places & Country"
+    },
+    {
+      "word": "Mars",
+      "clue": "Places & Country"
+    },
+    {
+      "word": "Gujarat",
+      "clue": "Places & Country"
+    },
+    {
+      "word": "Silicon Valley",
+      "clue": "Places & Country"
+    }
   ]
 }

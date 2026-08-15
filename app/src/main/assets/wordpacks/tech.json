@@ -1,30 +1,105 @@
 {
   "name": "💻 Tech & Gadgets",
   "words": [
-    {"word": "iPhone", "clue": "Apple smartphone"},
-    {"word": "WiFi", "clue": "Wireless internet"},
-    {"word": "Bluetooth", "clue": "Short-range wireless"},
-    {"word": "Robot", "clue": "Automated machine"},
-    {"word": "Drone", "clue": "Flying camera"},
-    {"word": "VR Headset", "clue": "Virtual reality"},
-    {"word": "Tesla", "clue": "Electric car brand"},
-    {"word": "Instagram", "clue": "Photo sharing app"},
-    {"word": "YouTube", "clue": "Video platform"},
-    {"word": "Bitcoin", "clue": "Cryptocurrency"},
-    {"word": "PlayStation", "clue": "Sony gaming console"},
-    {"word": "Google", "clue": "Search engine giant"},
-    {"word": "Netflix", "clue": "Streaming service"},
-    {"word": "Alexa", "clue": "Voice assistant"},
-    {"word": "Laptop", "clue": "Portable computer"},
-    {"word": "Smartwatch", "clue": "Wrist computer"},
-    {"word": "AirPods", "clue": "Wireless earbuds"},
-    {"word": "TikTok", "clue": "Short video app"},
-    {"word": "3D Printer", "clue": "Makes physical objects"},
-    {"word": "GPS", "clue": "Navigation system"},
-    {"word": "Selfie Stick", "clue": "Extended photo tool"},
-    {"word": "Spotify", "clue": "Music streaming"},
-    {"word": "ChatGPT", "clue": "AI chatbot"},
-    {"word": "Nintendo Switch", "clue": "Hybrid gaming console"},
-    {"word": "USB", "clue": "Universal connector"}
+    {
+      "word": "iPhone",
+      "clue": "Technology"
+    },
+    {
+      "word": "WiFi",
+      "clue": "Technology"
+    },
+    {
+      "word": "Bluetooth",
+      "clue": "Technology"
+    },
+    {
+      "word": "Robot",
+      "clue": "Technology"
+    },
+    {
+      "word": "Drone",
+      "clue": "Technology"
+    },
+    {
+      "word": "VR Headset",
+      "clue": "Technology"
+    },
+    {
+      "word": "Tesla",
+      "clue": "Technology"
+    },
+    {
+      "word": "Instagram",
+      "clue": "Technology"
+    },
+    {
+      "word": "YouTube",
+      "clue": "Technology"
+    },
+    {
+      "word": "Bitcoin",
+      "clue": "Technology"
+    },
+    {
+      "word": "PlayStation",
+      "clue": "Technology"
+    },
+    {
+      "word": "Google",
+      "clue": "Technology"
+    },
+    {
+      "word": "Netflix",
+      "clue": "Technology"
+    },
+    {
+      "word": "Alexa",
+      "clue": "Technology"
+    },
+    {
+      "word": "Laptop",
+      "clue": "Technology"
+    },
+    {
+      "word": "Smartwatch",
+      "clue": "Technology"
+    },
+    {
+      "word": "AirPods",
+      "clue": "Technology"
+    },
+    {
+      "word": "TikTok",
+      "clue": "Technology"
+    },
+    {
+      "word": "3D Printer",
+      "clue": "Technology"
+    },
+    {
+      "word": "GPS",
+      "clue": "Technology"
+    },
+    {
+      "word": "Selfie Stick",
+      "clue": "Technology"
+    },
+    {
+      "word": "Spotify",
+      "clue": "Technology"
+    },
+    {
+      "word": "ChatGPT",
+      "clue": "Technology"
+    },
+    {
+      "word": "Nintendo Switch",
+      "clue": "Technology"
+    },
+    {
+      "word": "USB",
+      "clue": "Technology"
+    }
   ]
 }
