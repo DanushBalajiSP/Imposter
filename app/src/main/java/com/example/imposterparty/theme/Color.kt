@@ -41,3 +41,19 @@ val GradientEnd = Color(0xFF0F3460)
 // Card gradient for secret card
 val CardFront = Color(0xFF2D2D4A)
 val CardBack = Color(0xFF7C4DFF)
+
+// ── Deep Space Edition (Stitch Design) ──
+val DeepSpaceBg = Color(0xFF0A0C1A)           // Deepest background
+val DeepSpaceSurface = Color(0xFF141628)      // Imposter silhouette bg
+val NeonPurple = Color(0xFF7C3CFF)            // Primary neon purple
+val NeonPurpleGlow = Color(0xFF9055FF)        // Lighter purple for gradient
+val NeonCyan = Color(0xFF00D9FF)              // Cyan accent
+val NeonCyanSoft = Color(0xFFAEECFF)          // Soft cyan text
+val NeonGold = Color(0xFFEEC200)              // Tertiary gold
+val ImposterEyeRed = Color(0xFFFF4444)        // Glowing red eyes
+val OutlineSubtle = Color(0xFF4A4456)         // Subtle outline
+val OnSurfaceVariant = Color(0xFFCBC3D9)      // Muted text
+val PrimaryContainerNeon = Color(0xFFD0BCFF)  // Purple neon glow
+val StitchSurfaceContainer = Color(0xFF1C1E34)      // Card surface
+val StitchSurfaceContainerHigh = Color(0xFF26283F)  // Elevated pill / badge
+val StitchSurfaceBright = Color(0xFF35374F)         // Circle button surface

@@ -168,13 +168,14 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
 
-            // Determine imposter count
+            // Determine imposter count (respecting player-count ratio limits)
+            val maxByRatio = maxImpostersForPlayerCount(players.size)
             val imposterCount = when (settings.imposterMode) {
-                ImposterMode.MANUAL -> settings.manualImposterCount.coerceIn(1, players.size - 1)
+                ImposterMode.MANUAL -> settings.manualImposterCount.coerceIn(1, minOf(maxByRatio, players.size - 1))
                 ImposterMode.AUTO_RANGE -> {
-                    val maxAllowed = minOf(settings.autoRange.max, players.size - 1)
-                    val minAllowed = settings.autoRange.min.coerceAtMost(maxAllowed)
-                    (minAllowed..maxAllowed).random()
+                    val cappedMax = minOf(settings.autoRange.max, maxByRatio, players.size - 1)
+                    val minAllowed = settings.autoRange.min.coerceAtMost(cappedMax)
+                    (minAllowed..cappedMax).random()
                 }
             }
 

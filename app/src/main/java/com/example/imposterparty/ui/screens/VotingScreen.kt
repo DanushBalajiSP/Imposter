@@ -1,27 +1,36 @@
 package com.example.imposterparty.ui.screens
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.HowToVote
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -47,194 +56,361 @@ fun VotingScreen(
         }
     }
 
+    val infiniteTransition = rememberInfiniteTransition(label = "votingGlow")
+    val pulseGlow by infiniteTransition.animateFloat(
+        initialValue = 0.3f,
+        targetValue = 0.7f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1500, easing = EaseInOutSine),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "pulseGlow",
+    )
+
     Box(
         modifier = modifier
-            .background(Brush.verticalGradient(listOf(DarkBackground, GradientEnd, DarkBackground)))
-            .padding(24.dp),
+            .background(DeepSpaceBg)
+            .fillMaxSize(),
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 20.dp),
         ) {
-            // Header
-            Text(
-                "🗳️ Secret Voting",
-                style = MaterialTheme.typography.headlineMedium.copy(
-                    fontWeight = FontWeight.Black,
-                    letterSpacing = 1.sp,
-                ),
-                color = TextOnDark,
-            )
+            // ── Top Header ──
+            Spacer(Modifier.height(12.dp))
 
-            Spacer(Modifier.height(4.dp))
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.HowToVote,
+                        contentDescription = null,
+                        tint = PrimaryContainerNeon,
+                        modifier = Modifier.size(22.dp),
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        text = "SECRET VOTING",
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontWeight = FontWeight.Black,
+                            letterSpacing = 1.5.sp,
+                        ),
+                        color = Color.White,
+                    )
+                }
 
-            Text(
-                "Voter ${gameState.currentVoterIndex + 1} of ${gameState.players.size}",
-                style = MaterialTheme.typography.titleMedium.copy(
-                    fontWeight = FontWeight.ExtraBold,
-                ),
-                color = ImposterPrimaryLight,
-            )
+                // Voter progress counter pill
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(9999.dp))
+                        .background(StitchSurfaceContainerHigh)
+                        .border(
+                            BorderStroke(1.dp, OutlineSubtle.copy(alpha = 0.35f)),
+                            RoundedCornerShape(9999.dp),
+                        )
+                        .padding(horizontal = 10.dp, vertical = 4.dp),
+                ) {
+                    Text(
+                        text = "Voter ${gameState.currentVoterIndex + 1} of ${gameState.players.size}",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontWeight = FontWeight.Bold,
+                        ),
+                        color = NeonCyanSoft,
+                    )
+                }
+            }
 
-            Spacer(Modifier.height(6.dp))
+            Spacer(Modifier.height(10.dp))
 
-            LinearProgressIndicator(
-                progress = { (gameState.currentVoterIndex.toFloat()) / gameState.players.size },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(6.dp)
-                    .clip(RoundedCornerShape(3.dp)),
-                color = ImposterPrimary,
-                trackColor = DarkSurfaceVariant,
-            )
-
-            Spacer(Modifier.height(20.dp))
-
+            // ── Prominent Center Current Voter Card ──
             if (currentVoter != null) {
-                // Current voter info
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = DarkSurfaceVariant.copy(alpha = 0.7f)),
-                    shape = RoundedCornerShape(18.dp),
-                    border = BorderStroke(1.5.dp, ImposterSecondary.copy(alpha = 0.3f)),
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(18.dp))
+                        .background(StitchSurfaceContainer)
+                        .border(
+                            BorderStroke(1.5.dp, NeonPurple.copy(alpha = 0.6f)),
+                            RoundedCornerShape(18.dp),
+                        )
+                        .padding(vertical = 14.dp, horizontal = 16.dp),
+                    contentAlignment = Alignment.Center,
                 ) {
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
+                        modifier = Modifier.fillMaxWidth(),
                     ) {
                         Text(
-                            "Pass phone to",
-                            style = MaterialTheme.typography.bodyMedium.copy(
-                                fontWeight = FontWeight.SemiBold,
+                            text = "👉 PASS PHONE TO / VOTING NOW",
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 1.5.sp,
+                                fontSize = 11.sp,
                             ),
-                            color = TextOnDarkSecondary,
+                            color = OnSurfaceVariant,
                         )
-                        Spacer(Modifier.height(2.dp))
+
+                        Spacer(Modifier.height(4.dp))
+
+                        // Large, Bold Voter Name
                         Text(
-                            currentVoter.name,
+                            text = currentVoter.name,
                             style = MaterialTheme.typography.headlineMedium.copy(
                                 fontWeight = FontWeight.Black,
+                                letterSpacing = 0.5.sp,
+                                fontSize = 28.sp,
                             ),
-                            color = ImposterSecondary,
+                            color = PrimaryContainerNeon,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.drawBehind {
+                                drawCircle(
+                                    brush = Brush.radialGradient(
+                                        listOf(
+                                            NeonPurple.copy(alpha = 0.35f),
+                                            Color.Transparent,
+                                        ),
+                                        center = center,
+                                        radius = size.width * 0.6f,
+                                    ),
+                                    radius = size.width * 0.6f,
+                                    center = center,
+                                )
+                            },
                         )
+
                         Spacer(Modifier.height(4.dp))
+
                         Text(
-                            "Who do you think is the Imposter?",
-                            style = MaterialTheme.typography.bodyMedium.copy(
-                                fontWeight = FontWeight.ExtraBold,
+                            text = "Who do you think is the Imposter?",
+                            style = MaterialTheme.typography.bodySmall.copy(
+                                fontWeight = FontWeight.Bold,
                             ),
                             color = WarningYellow,
+                            textAlign = TextAlign.Center,
                         )
                     }
                 }
 
-                Spacer(Modifier.height(16.dp))
+                Spacer(Modifier.height(10.dp))
 
-                // Player list to vote for
-                LazyColumn(
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                    modifier = Modifier.weight(1f),
+                // Progress Bar
+                LinearProgressIndicator(
+                    progress = { (gameState.currentVoterIndex.toFloat() + 1f) / gameState.players.size.coerceAtLeast(1) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(4.dp)
+                        .clip(RoundedCornerShape(2.dp)),
+                    color = NeonPurple,
+                    trackColor = StitchSurfaceContainerHigh,
+                )
+
+                Spacer(Modifier.height(14.dp))
+
+                // ── 2-Column Player Grid ──
+                val candidatePlayers = remember(gameState.players, currentVoter.id) {
+                    gameState.players.filter { it.id != currentVoter.id }
+                }
+
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(2),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    contentPadding = PaddingValues(bottom = 110.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
                 ) {
-                    val otherPlayers = gameState.players.filter { it.id != currentVoter.id }
-                    items(otherPlayers) { player ->
+                    items(candidatePlayers, key = { it.id }) { player ->
                         val isSelected = selectedPlayerId == player.id
 
-                        Card(
+                        Box(
                             modifier = Modifier
                                 .fillMaxWidth()
+                                .height(150.dp)
+                                .clip(RoundedCornerShape(24.dp))
+                                .background(if (isSelected) StitchSurfaceContainerHigh else StitchSurfaceContainer)
+                                .border(
+                                    BorderStroke(
+                                        if (isSelected) 2.dp else 1.dp,
+                                        if (isSelected) NeonPurple else OutlineSubtle.copy(alpha = 0.3f),
+                                    ),
+                                    RoundedCornerShape(24.dp),
+                                )
                                 .clickable {
                                     selectedPlayerId = player.id
                                     haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                },
-                            colors = CardDefaults.cardColors(
-                                containerColor = if (isSelected) ImposterPrimary.copy(alpha = 0.25f)
-                                else DarkSurfaceVariant.copy(alpha = 0.5f),
-                            ),
-                            shape = RoundedCornerShape(16.dp),
-                            border = BorderStroke(
-                                width = if (isSelected) 2.5.dp else 1.dp,
-                                color = if (isSelected) ImposterSecondary else DarkSurfaceHigh,
-                            ),
+                                }
+                                .padding(14.dp),
                         ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
+                            // Left indicator accent strip
+                            Box(
                                 modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                                    .align(Alignment.CenterStart)
+                                    .width(3.dp)
+                                    .height(36.dp)
+                                    .clip(RoundedCornerShape(2.dp))
+                                    .background(if (isSelected) NeonPurple else NeonCyan),
+                            )
+
+                            // Top-right selection icon
+                            if (isSelected) {
+                                Icon(
+                                    imageVector = Icons.Default.CheckCircle,
+                                    contentDescription = "Selected",
+                                    tint = NeonPurpleGlow,
+                                    modifier = Modifier
+                                        .align(Alignment.TopEnd)
+                                        .size(20.dp),
+                                )
+                            }
+
+                            // Card Content
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center,
+                                modifier = Modifier.fillMaxSize(),
                             ) {
+                                // Circular Avatar
                                 Box(
                                     modifier = Modifier
-                                        .size(44.dp)
+                                        .size(54.dp)
                                         .clip(CircleShape)
-                                        .background(
-                                            if (isSelected) ImposterSecondary
-                                             else DarkSurfaceHigh
+                                        .background(StitchSurfaceBright)
+                                        .border(
+                                            BorderStroke(
+                                                1.dp,
+                                                if (isSelected) NeonPurple.copy(alpha = 0.5f) else OutlineSubtle.copy(alpha = 0.3f),
+                                            ),
+                                            CircleShape,
                                         ),
                                     contentAlignment = Alignment.Center,
                                 ) {
-                                    if (isSelected) {
-                                        Icon(
-                                            Icons.Default.Check,
-                                            null,
-                                            tint = DarkBackground,
-                                            modifier = Modifier.size(24.dp),
-                                        )
-                                    } else {
-                                        Text(
-                                            player.name.first().uppercase(),
-                                            style = MaterialTheme.typography.titleLarge.copy(
-                                                fontWeight = FontWeight.Black,
-                                            ),
-                                            color = TextOnDark,
-                                        )
-                                    }
+                                    Icon(
+                                        imageVector = Icons.Default.Person,
+                                        contentDescription = null,
+                                        tint = if (isSelected) NeonPurpleGlow else OnSurfaceVariant,
+                                        modifier = Modifier.size(28.dp),
+                                    )
                                 }
-                                Spacer(Modifier.width(16.dp))
+
+                                Spacer(Modifier.height(8.dp))
+
+                                // Player Name
                                 Text(
-                                    player.name,
-                                    style = MaterialTheme.typography.titleLarge.copy(
-                                        fontWeight = if (isSelected) FontWeight.Black else FontWeight.Bold,
+                                    text = player.name,
+                                    style = MaterialTheme.typography.bodyLarge.copy(
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 15.sp,
                                     ),
-                                    color = if (isSelected) ImposterSecondary else TextOnDark,
+                                    color = Color.White,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    textAlign = TextAlign.Center,
+                                )
+
+                                Spacer(Modifier.height(2.dp))
+
+                                // Status text
+                                Text(
+                                    text = if (isSelected) "ACCUSE" else "SUSPECT",
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        fontWeight = FontWeight.Bold,
+                                        letterSpacing = 1.sp,
+                                        fontSize = 9.sp,
+                                    ),
+                                    color = if (isSelected) NeonPurpleGlow else OnSurfaceVariant.copy(alpha = 0.6f),
                                 )
                             }
                         }
                     }
                 }
+            }
+        }
 
-                Spacer(Modifier.height(16.dp))
-
-                // Cast vote button
-                Button(
-                    onClick = {
-                        selectedPlayerId?.let { id ->
-                            gameViewModel.castVote(id)
-                            selectedPlayerId = null
-                        }
-                    },
-                    enabled = selectedPlayerId != null,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(58.dp),
-                    shape = RoundedCornerShape(18.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = DangerRed,
-                        disabledContainerColor = DarkSurfaceVariant,
-                    ),
-                    border = BorderStroke(
-                        width = if (selectedPlayerId != null) 1.5.dp else 0.dp,
-                        color = if (selectedPlayerId != null) Color.White.copy(alpha = 0.4f) else Color.Transparent
-                    ),
-                ) {
-                    Icon(Icons.Default.HowToVote, null, modifier = Modifier.size(22.dp))
-                    Spacer(Modifier.width(10.dp))
-                    Text(
-                        "Submit Secret Vote",
-                        fontWeight = FontWeight.Black,
-                        style = MaterialTheme.typography.titleMedium,
+        // ── Fixed Bottom Action Bar (Confirm Vote) ──
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .background(
+                    Brush.verticalGradient(
+                        listOf(
+                            Color.Transparent,
+                            StitchSurfaceContainerHigh.copy(alpha = 0.85f),
+                            StitchSurfaceContainerHigh,
+                        )
                     )
+                )
+                .border(
+                    BorderStroke(1.dp, OutlineSubtle.copy(alpha = 0.2f)),
+                    shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
+                )
+                .padding(horizontal = 20.dp, vertical = 16.dp),
+        ) {
+            val isEnabled = selectedPlayerId != null
+
+            Button(
+                onClick = {
+                    selectedPlayerId?.let { id ->
+                        gameViewModel.castVote(id)
+                        selectedPlayerId = null
+                    }
+                },
+                enabled = isEnabled,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp),
+                shape = RoundedCornerShape(9999.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color.Transparent,
+                    disabledContainerColor = StitchSurfaceContainerHigh,
+                ),
+                contentPadding = PaddingValues(0.dp),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            if (isEnabled) {
+                                Brush.verticalGradient(listOf(NeonPurpleGlow, NeonPurple))
+                            } else {
+                                SolidColor(StitchSurfaceContainerHigh)
+                            }
+                        )
+                        .border(
+                            BorderStroke(
+                                1.dp,
+                                if (isEnabled) PrimaryContainerNeon.copy(alpha = 0.4f) else OutlineSubtle.copy(alpha = 0.2f),
+                            ),
+                            shape = RoundedCornerShape(9999.dp),
+                        ),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.HowToVote,
+                            contentDescription = null,
+                            tint = if (isEnabled) Color.White else OnSurfaceVariant.copy(alpha = 0.4f),
+                            modifier = Modifier.size(20.dp),
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            text = if (isEnabled) "Confirm Vote" else "Select a Player",
+                            style = MaterialTheme.typography.titleMedium.copy(
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 16.sp,
+                            ),
+                            color = if (isEnabled) Color.White else OnSurfaceVariant.copy(alpha = 0.4f),
+                        )
+                    }
                 }
             }
         }

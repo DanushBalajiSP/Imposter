@@ -4,13 +4,17 @@ import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ChatBubble
 import androidx.compose.material.icons.filled.HowToVote
+import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -58,36 +62,60 @@ fun DiscussionScreen(
     }
     val progress = if (totalSeconds > 0) gameState.timerRemainingSeconds.toFloat() / totalSeconds else 0f
 
-    // Timer color transitions from green to yellow to red
+    // Timer color transitions
     val timerColor = when {
-        progress > 0.5f -> SuccessGreen
-        progress > 0.2f -> WarningYellow
+        progress > 0.5f -> NeonCyan
+        progress > 0.2f -> NeonGold
         else -> DangerRed
     }
 
     Box(
         modifier = modifier
-            .background(Brush.verticalGradient(listOf(DarkBackground, GradientMid, DarkBackground)))
-            .padding(horizontal = 20.dp, vertical = 16.dp),
+            .background(DeepSpaceBg)
+            .fillMaxSize(),
     ) {
         Column(
-            modifier = Modifier.fillMaxSize(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 20.dp),
         ) {
-            // Header
+            // ── Header ──
+            Spacer(Modifier.height(16.dp))
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Icon(
+                    imageVector = Icons.Default.ChatBubble,
+                    contentDescription = null,
+                    tint = PrimaryContainerNeon,
+                    modifier = Modifier.size(24.dp),
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = "DISCUSSION TIME",
+                    style = MaterialTheme.typography.headlineSmall.copy(
+                        fontWeight = FontWeight.Black,
+                        letterSpacing = 1.5.sp,
+                    ),
+                    color = Color.White,
+                )
+            }
+
+            Spacer(Modifier.height(6.dp))
+
             Text(
-                "💬 Discussion Time",
-                style = MaterialTheme.typography.headlineMedium.copy(
-                    fontWeight = FontWeight.Black,
-                    letterSpacing = 1.sp,
-                ),
-                color = TextOnDark,
-                textAlign = TextAlign.Center,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 16.dp),
+                text = "Who is the Imposter?",
+                style = MaterialTheme.typography.bodyMedium,
+                color = OnSurfaceVariant,
             )
 
-            // Scrollable Content
+            Spacer(Modifier.height(16.dp))
+
+            // ── Scrollable Content ──
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier
@@ -104,7 +132,7 @@ fun DiscussionScreen(
                             .padding(8.dp),
                     ) {
                         Canvas(modifier = Modifier.fillMaxSize()) {
-                            val strokeWidth = 14.dp.toPx()
+                            val strokeWidth = 12.dp.toPx()
                             val radius = (size.minDimension - strokeWidth) / 2
                             val topLeft = Offset(
                                 (size.width - radius * 2) / 2,
@@ -113,7 +141,7 @@ fun DiscussionScreen(
 
                             // Background track
                             drawArc(
-                                color = DarkSurfaceVariant,
+                                color = StitchSurfaceContainerHigh,
                                 startAngle = -90f,
                                 sweepAngle = 360f,
                                 useCenter = false,
@@ -138,116 +166,49 @@ fun DiscussionScreen(
                             val minutes = gameState.timerRemainingSeconds / 60
                             val seconds = gameState.timerRemainingSeconds % 60
                             Text(
-                                "%02d:%02d".format(minutes, seconds),
+                                text = "%02d:%02d".format(minutes, seconds),
                                 style = MaterialTheme.typography.displayMedium.copy(
                                     fontWeight = FontWeight.Black,
-                                    letterSpacing = 2.sp,
+                                    letterSpacing = 1.5.sp,
                                 ),
                                 color = timerColor,
                             )
                             Text(
-                                "REMAINING",
+                                text = "REMAINING",
                                 style = MaterialTheme.typography.labelSmall.copy(
-                                    fontWeight = FontWeight.ExtraBold,
+                                    fontWeight = FontWeight.Bold,
                                     letterSpacing = 2.sp,
                                 ),
-                                color = TextOnDarkSecondary,
+                                color = OnSurfaceVariant,
                             )
                         }
                     }
                 } else {
-                    // Untimed Discussion Card
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(containerColor = DarkSurfaceVariant.copy(alpha = 0.7f)),
-                        shape = RoundedCornerShape(20.dp),
-                        border = BorderStroke(1.5.dp, ImposterSecondary.copy(alpha = 0.4f)),
+                    // Untimed Mode Pill
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(StitchSurfaceContainer)
+                            .border(BorderStroke(1.dp, NeonCyan.copy(alpha = 0.4f)), RoundedCornerShape(20.dp))
+                            .padding(20.dp),
+                        contentAlignment = Alignment.Center,
                     ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(20.dp),
-                        ) {
-                            Text("♾️", fontSize = 44.sp)
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("♾️", fontSize = 36.sp)
                             Spacer(Modifier.height(8.dp))
                             Text(
-                                "Free Discussion Mode",
-                                style = MaterialTheme.typography.titleLarge,
-                                color = ImposterSecondary,
-                                fontWeight = FontWeight.Black,
+                                text = "Free Discussion Mode",
+                                style = MaterialTheme.typography.titleMedium.copy(
+                                    fontWeight = FontWeight.Bold,
+                                ),
+                                color = NeonCyanSoft,
                             )
-                            Spacer(Modifier.height(6.dp))
+                            Spacer(Modifier.height(4.dp))
                             Text(
-                                "Take your time to question players and discuss clues. When ready, tap 'Vote Now' below.",
+                                text = "Take your time to question players and discuss clues. When ready, tap 'Vote Now' below.",
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = TextOnDarkSecondary,
-                                textAlign = TextAlign.Center,
-                                fontWeight = FontWeight.Medium,
-                            )
-                        }
-                    }
-                }
-
-                Spacer(Modifier.height(24.dp))
-
-                // Single Starting Speaker Highlight Card (Randomly Selected)
-                if (startingSpeaker != null) {
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(containerColor = DarkSurfaceVariant.copy(alpha = 0.75f)),
-                        shape = RoundedCornerShape(20.dp),
-                        border = BorderStroke(2.dp, ImposterSecondary.copy(alpha = 0.7f)),
-                    ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(20.dp),
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(54.dp)
-                                    .clip(CircleShape)
-                                    .background(
-                                        Brush.radialGradient(listOf(ImposterSecondary, ImposterSecondaryDark))
-                                    ),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Text("🎤", fontSize = 26.sp)
-                            }
-
-                            Spacer(Modifier.height(12.dp))
-
-                            Text(
-                                "STARTS THE CONVERSATION",
-                                style = MaterialTheme.typography.labelMedium.copy(
-                                    fontWeight = FontWeight.ExtraBold,
-                                    letterSpacing = 2.sp,
-                                ),
-                                color = TextOnDarkSecondary,
-                            )
-
-                            Spacer(Modifier.height(6.dp))
-
-                            Text(
-                                startingSpeaker.name,
-                                style = MaterialTheme.typography.headlineMedium.copy(
-                                    fontWeight = FontWeight.Black,
-                                    letterSpacing = 1.sp,
-                                ),
-                                color = ImposterSecondary,
-                                textAlign = TextAlign.Center,
-                            )
-
-                            Spacer(Modifier.height(8.dp))
-
-                            Text(
-                                "${startingSpeaker.name} gives the first clue or statement, then everyone discusses freely!",
-                                style = MaterialTheme.typography.bodyMedium.copy(
-                                    fontWeight = FontWeight.Medium,
-                                ),
-                                color = TextOnDarkSecondary,
+                                color = OnSurfaceVariant,
                                 textAlign = TextAlign.Center,
                             )
                         }
@@ -255,32 +216,139 @@ fun DiscussionScreen(
                 }
 
                 Spacer(Modifier.height(20.dp))
-            }
 
-            // Fixed Bottom Action Button (Vote Now)
-            Surface(
-                color = DarkBackground.copy(alpha = 0.95f),
+                // ── Starting Speaker Highlight Card ──
+                if (startingSpeaker != null) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(StitchSurfaceContainer)
+                            .border(BorderStroke(1.5.dp, NeonPurple.copy(alpha = 0.7f)), RoundedCornerShape(20.dp))
+                            .padding(20.dp),
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(54.dp)
+                                    .clip(CircleShape)
+                                    .background(
+                                        Brush.verticalGradient(listOf(NeonPurpleGlow, NeonPurple))
+                                    ),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Mic,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(26.dp),
+                                )
+                            }
+
+                            Spacer(Modifier.height(10.dp))
+
+                            Text(
+                                text = "STARTS THE CONVERSATION",
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    letterSpacing = 1.5.sp,
+                                ),
+                                color = OnSurfaceVariant,
+                            )
+
+                            Spacer(Modifier.height(4.dp))
+
+                            Text(
+                                text = startingSpeaker.name,
+                                style = MaterialTheme.typography.headlineMedium.copy(
+                                    fontWeight = FontWeight.Black,
+                                    letterSpacing = 0.5.sp,
+                                ),
+                                color = PrimaryContainerNeon,
+                                textAlign = TextAlign.Center,
+                            )
+
+                            Spacer(Modifier.height(6.dp))
+
+                            Text(
+                                text = "${startingSpeaker.name} gives the first clue or statement, then everyone discusses freely!",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = OnSurfaceVariant.copy(alpha = 0.8f),
+                                textAlign = TextAlign.Center,
+                            )
+                        }
+                    }
+                }
+
+                Spacer(Modifier.height(110.dp))
+            }
+        }
+
+        // ── Fixed Bottom Action Bar (Vote Now) ──
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .background(
+                    Brush.verticalGradient(
+                        listOf(
+                            Color.Transparent,
+                            StitchSurfaceContainerHigh.copy(alpha = 0.85f),
+                            StitchSurfaceContainerHigh,
+                        )
+                    )
+                )
+                .border(
+                    BorderStroke(1.dp, OutlineSubtle.copy(alpha = 0.2f)),
+                    shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
+                )
+                .padding(horizontal = 20.dp, vertical = 16.dp),
+        ) {
+            Button(
+                onClick = onEndDiscussion,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 8.dp),
+                    .height(56.dp),
+                shape = RoundedCornerShape(9999.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
+                contentPadding = PaddingValues(0.dp),
             ) {
-                Button(
-                    onClick = onEndDiscussion,
+                Box(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .height(58.dp),
-                    shape = RoundedCornerShape(18.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = DangerRed),
-                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.3f)),
+                        .fillMaxSize()
+                        .background(
+                            Brush.verticalGradient(listOf(NeonPurpleGlow, NeonPurple)),
+                            shape = RoundedCornerShape(9999.dp),
+                        )
+                        .border(
+                            BorderStroke(1.dp, PrimaryContainerNeon.copy(alpha = 0.4f)),
+                            shape = RoundedCornerShape(9999.dp),
+                        ),
+                    contentAlignment = Alignment.Center,
                 ) {
-                    Icon(Icons.Default.HowToVote, null, modifier = Modifier.size(24.dp))
-                    Spacer(Modifier.width(10.dp))
-                    Text(
-                        "Vote Now",
-                        fontWeight = FontWeight.Black,
-                        style = MaterialTheme.typography.titleMedium,
-                        color = Color.White,
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.HowToVote,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(20.dp),
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            text = "Vote Now",
+                            style = MaterialTheme.typography.titleMedium.copy(
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 16.sp,
+                            ),
+                            color = Color.White,
+                        )
+                    }
                 }
             }
         }
