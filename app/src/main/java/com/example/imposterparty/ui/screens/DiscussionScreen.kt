@@ -91,26 +91,26 @@ fun DiscussionScreen(
                 Icon(
                     imageVector = Icons.Default.ChatBubble,
                     contentDescription = null,
-                    tint = PrimaryContainerNeon,
+                    tint = if (gameState.isSubRound) DangerRed else PrimaryContainerNeon,
                     modifier = Modifier.size(24.dp),
                 )
                 Spacer(Modifier.width(8.dp))
                 Text(
-                    text = "DISCUSSION TIME",
+                    text = if (gameState.isSubRound) "SUB-ROUND DISCUSSION" else "DISCUSSION TIME",
                     style = MaterialTheme.typography.headlineSmall.copy(
                         fontWeight = FontWeight.Black,
                         letterSpacing = 1.5.sp,
                     ),
-                    color = Color.White,
+                    color = if (gameState.isSubRound) DangerRed else Color.White,
                 )
             }
 
             Spacer(Modifier.height(6.dp))
 
             Text(
-                text = "Who is the Imposter?",
+                text = if (gameState.isSubRound) "Final chance to find the remaining Imposter!" else "Who is the Imposter?",
                 style = MaterialTheme.typography.bodyMedium,
-                color = OnSurfaceVariant,
+                color = if (gameState.isSubRound) WarningYellow else OnSurfaceVariant,
             )
 
             Spacer(Modifier.height(16.dp))

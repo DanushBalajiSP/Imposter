@@ -199,7 +199,19 @@ fun ResultScreen(
                     },
                 )
 
-                Spacer(Modifier.height(10.dp))
+                // ── Final Phase Description / Outcome Subtitle ──
+                if (!gameState.finalPhaseDescription.isNullOrBlank()) {
+                    Text(
+                        text = gameState.finalPhaseDescription!!,
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                        ),
+                        color = WarningYellow,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                    )
+                    Spacer(Modifier.height(10.dp))
+                }
 
                 // ── Accused Pill ──
                 if (accusedPlayer != null) {
@@ -439,11 +451,10 @@ fun ResultScreen(
                         // Player Rows
                         gameState.players.forEachIndexed { index, player ->
                             val isImposter = player.role == Role.IMPOSTER
-                            val roundPoints = if (isCivilianWin) {
-                                if (isImposter) 0 else 1
-                            } else {
-                                if (isImposter) 1 else 0
-                            }
+                            val roundPoints = gameState.pendingRoundScores.getOrDefault(
+                                player.name,
+                                if (isCivilianWin) (if (isImposter) 0 else 1) else (if (isImposter) 1 else 0)
+                            )
                             val totalPoints = sessionScores.getOrDefault(player.name, 0)
 
                             Row(

@@ -49,9 +49,17 @@ fun VotingScreen(
     var selectedPlayerId by remember(gameState.currentVoterIndex) { mutableStateOf<Int?>(null) }
     val haptic = LocalHapticFeedback.current
 
-    // Watch for phase transition to Result
+    val activePlayers = remember(gameState.players, gameState.eliminatedPlayerIds, gameState.isSubRound) {
+        if (gameState.isSubRound) {
+            gameState.players.filter { it.id !in gameState.eliminatedPlayerIds }
+        } else {
+            gameState.players
+        }
+    }
+
+    // Watch for phase transitions
     LaunchedEffect(gameState.phase) {
-        if (gameState.phase == GamePhase.RESULT) {
+        if (gameState.phase == GamePhase.RESULT || gameState.phase == GamePhase.FINAL_IMPOSTER_CHOICE) {
             onVotingComplete()
         }
     }
@@ -90,17 +98,17 @@ fun VotingScreen(
                     Icon(
                         imageVector = Icons.Default.HowToVote,
                         contentDescription = null,
-                        tint = PrimaryContainerNeon,
+                        tint = if (gameState.isSubRound) DangerRed else PrimaryContainerNeon,
                         modifier = Modifier.size(22.dp),
                     )
                     Spacer(Modifier.width(6.dp))
                     Text(
-                        text = "SECRET VOTING",
+                        text = if (gameState.isSubRound) "SUB-ROUND VOTING" else "SECRET VOTING",
                         style = MaterialTheme.typography.titleMedium.copy(
                             fontWeight = FontWeight.Black,
                             letterSpacing = 1.5.sp,
                         ),
-                        color = Color.White,
+                        color = if (gameState.isSubRound) DangerRed else Color.White,
                     )
                 }
 
@@ -116,7 +124,7 @@ fun VotingScreen(
                         .padding(horizontal = 10.dp, vertical = 4.dp),
                 ) {
                     Text(
-                        text = "Voter ${gameState.currentVoterIndex + 1} of ${gameState.players.size}",
+                        text = "Voter ${gameState.currentVoterIndex + 1} of ${activePlayers.size}",
                         style = MaterialTheme.typography.labelSmall.copy(
                             fontWeight = FontWeight.Bold,
                         ),
@@ -200,7 +208,7 @@ fun VotingScreen(
 
                 // Progress Bar
                 LinearProgressIndicator(
-                    progress = { (gameState.currentVoterIndex.toFloat() + 1f) / gameState.players.size.coerceAtLeast(1) },
+                    progress = { (gameState.currentVoterIndex.toFloat() + 1f) / activePlayers.size.coerceAtLeast(1) },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(4.dp)
@@ -212,8 +220,8 @@ fun VotingScreen(
                 Spacer(Modifier.height(14.dp))
 
                 // ── 2-Column Player Grid ──
-                val candidatePlayers = remember(gameState.players, currentVoter.id) {
-                    gameState.players.filter { it.id != currentVoter.id }
+                val candidatePlayers = remember(activePlayers, currentVoter.id) {
+                    activePlayers.filter { it.id != currentVoter.id }
                 }
 
                 LazyVerticalGrid(

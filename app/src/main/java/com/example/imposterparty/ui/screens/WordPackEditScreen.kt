@@ -17,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.example.imposterparty.theme.*
 import com.example.imposterparty.viewmodel.GameViewModel
 
@@ -158,6 +159,35 @@ fun WordPackEditScreen(
                         style = MaterialTheme.typography.bodySmall,
                         color = TextOnDarkSecondary,
                     )
+                    Spacer(Modifier.height(8.dp))
+
+                    // Word count recommendation banner
+                    Surface(
+                        color = DarkSurfaceVariant.copy(alpha = 0.6f),
+                        shape = RoundedCornerShape(10.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, ImposterSecondary.copy(alpha = 0.35f)),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                        ) {
+                            Text("💡", fontSize = 16.sp)
+                            Spacer(Modifier.width(8.dp))
+                            Column {
+                                Text(
+                                    "Recommended: 20+ words (20–30+ for hard difficulty)",
+                                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                                    color = ImposterSecondary,
+                                )
+                                Text(
+                                    "Smaller packs may repeat words more often.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = TextOnDarkSecondary,
+                                )
+                            }
+                        }
+                    }
                     Spacer(Modifier.height(8.dp))
                 }
 

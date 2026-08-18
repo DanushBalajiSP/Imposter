@@ -21,6 +21,15 @@ data class GameState(
     val actualImposterCount: Int = 0,
     val accusedPlayerId: Int? = null,
     val isImposterFound: Boolean = false,
+    // ── Final Imposter & Sub-Round fields ──
+    val eliminatedPlayerIds: List<Int> = emptyList(),
+    val remainingImposterId: Int? = null,
+    val imposterGuessWord: String? = null,
+    val wasWordGuessedCorrectly: Boolean? = null,
+    val finalPhaseDescription: String? = null,
+    val pendingRoundScores: Map<String, Int> = emptyMap(),
+    val isSubRound: Boolean = false,
+    val subRoundVoterIndices: List<Int> = emptyList(),
 )
 
 enum class GamePhase {
@@ -28,5 +37,8 @@ enum class GamePhase {
     REVEALING,
     DISCUSSION,
     VOTING,
+    FINAL_IMPOSTER_CHOICE, // Surviving imposter chooses: Guess Word or Play Sub-Round
+    SUB_ROUND_DISCUSSION,  // Smaller final clue/discussion
+    SUB_ROUND_VOTING,      // Smaller final voting
     RESULT,
 }

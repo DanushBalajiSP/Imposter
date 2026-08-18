@@ -43,6 +43,9 @@ fun MainNavigation() {
                             GamePhase.REVEALING -> backStack.add(CardRevealRoute)
                             GamePhase.DISCUSSION -> backStack.add(DiscussionRoute)
                             GamePhase.VOTING -> backStack.add(VotingRoute)
+                            GamePhase.FINAL_IMPOSTER_CHOICE -> backStack.add(FinalImposterChoiceRoute)
+                            GamePhase.SUB_ROUND_DISCUSSION -> backStack.add(SubRoundDiscussionRoute)
+                            GamePhase.SUB_ROUND_VOTING -> backStack.add(SubRoundVotingRoute)
                             else -> backStack.add(GameSetupRoute)
                         }
                     },
@@ -90,6 +93,44 @@ fun MainNavigation() {
             }
 
             entry<VotingRoute> {
+                VotingScreen(
+                    gameViewModel = gameViewModel,
+                    onVotingComplete = {
+                        if (gameViewModel.gameState.value.phase == GamePhase.FINAL_IMPOSTER_CHOICE) {
+                            backStack.add(FinalImposterChoiceRoute)
+                        } else {
+                            backStack.add(ResultRoute)
+                        }
+                    },
+                    modifier = baseMod,
+                )
+            }
+
+            entry<FinalImposterChoiceRoute> {
+                FinalImposterChoiceScreen(
+                    gameViewModel = gameViewModel,
+                    onNavigateToResult = {
+                        backStack.add(ResultRoute)
+                    },
+                    onNavigateToSubRoundDiscussion = {
+                        backStack.add(SubRoundDiscussionRoute)
+                    },
+                    modifier = baseMod,
+                )
+            }
+
+            entry<SubRoundDiscussionRoute> {
+                DiscussionScreen(
+                    gameViewModel = gameViewModel,
+                    onEndDiscussion = {
+                        gameViewModel.endSubRoundDiscussion()
+                        backStack.add(SubRoundVotingRoute)
+                    },
+                    modifier = baseMod,
+                )
+            }
+
+            entry<SubRoundVotingRoute> {
                 VotingScreen(
                     gameViewModel = gameViewModel,
                     onVotingComplete = {

@@ -11,6 +11,9 @@ import kotlinx.serialization.Serializable
 @Serializable data object CardRevealRoute : NavKey
 @Serializable data object DiscussionRoute : NavKey
 @Serializable data object VotingRoute : NavKey
+@Serializable data object FinalImposterChoiceRoute : NavKey
+@Serializable data object SubRoundDiscussionRoute : NavKey
+@Serializable data object SubRoundVotingRoute : NavKey
 @Serializable data object ResultRoute : NavKey
 @Serializable data object WordPackListRoute : NavKey
 @Serializable data class WordPackEditRoute(val packId: Long = -1) : NavKey
