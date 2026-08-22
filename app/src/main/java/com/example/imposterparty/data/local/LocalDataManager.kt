@@ -31,6 +31,10 @@ class LocalDataManager(private val context: Context) {
     private val matchesFile = File(context.filesDir, "matches.json")
     private val activeMatchFile = File(context.filesDir, "active_match.json")
     private val activeGameStateFile = File(context.filesDir, "active_game_state.json")
+    private val randomizerFile = File(context.filesDir, "randomizer_state.json")
+
+    private val _randomizerState = MutableStateFlow<RandomizerState>(RandomizerState())
+    val randomizerState: Flow<RandomizerState> = _randomizerState.asStateFlow()
 
     private val _allPacks = MutableStateFlow<List<WordPack>>(emptyList())
     val allPacks: Flow<List<WordPack>> = _allPacks.asStateFlow()
@@ -130,12 +134,13 @@ class LocalDataManager(private val context: Context) {
         _allPacks.value = builtInPacks + customPacks
         _allEntries.value = builtInEntries + customEntries
 
-        // Load scores, history, and matches
+        // Load scores, history, matches, and randomizer state
         _allScores.value = loadScores()
         _allHistory.value = loadHistory()
         _lastPlayerNames.value = loadLastPlayerNames()
         _allMatches.value = loadMatches()
         _activeMatch.value = loadActiveMatch()
+        _randomizerState.value = loadRandomizerState()
     }
 
     fun getPackById(packId: Long): WordPack? {
@@ -410,6 +415,61 @@ class LocalDataManager(private val context: Context) {
         }
     }
 
+    fun getRandomizerState(): RandomizerState {
+        return _randomizerState.value
+    }
+
+    suspend fun recordRoundPlayed(secretWord: String, imposterNames: List<String>) = withContext(Dispatchers.IO) {
+        val current = _randomizerState.value
+        val nextRoundCounter = current.globalRoundCounter + 1
+
+        val updatedWordHistory = current.wordUsageHistory.toMutableMap()
+        if (secretWord.isNotBlank()) {
+            val norm = com.example.imposterparty.data.randomizer.FairRandomizer.normalizeWord(secretWord)
+            updatedWordHistory[norm] = nextRoundCounter
+        }
+
+        val updatedImposterCounts = current.playerImposterCounts.toMutableMap()
+        imposterNames.forEach { name ->
+            val key = name.trim().lowercase()
+            updatedImposterCounts[key] = (updatedImposterCounts[key] ?: 0) + 1
+        }
+
+        val updatedRecentImposters = (listOf(imposterNames) + current.recentImposterNames).take(15)
+
+        val newState = RandomizerState(
+            globalRoundCounter = nextRoundCounter,
+            wordUsageHistory = updatedWordHistory,
+            playerImposterCounts = updatedImposterCounts,
+            recentImposterNames = updatedRecentImposters,
+        )
+        _randomizerState.value = newState
+        saveRandomizerStateToDisk(newState)
+    }
+
+    suspend fun resetRandomizerWeightage() = withContext(Dispatchers.IO) {
+        val newState = RandomizerState()
+        _randomizerState.value = newState
+        saveRandomizerStateToDisk(newState)
+    }
+
+    private fun loadRandomizerState(): RandomizerState {
+        if (!randomizerFile.exists()) return RandomizerState()
+        return try {
+            gson.fromJson(randomizerFile.readText(), RandomizerState::class.java) ?: RandomizerState()
+        } catch (e: Exception) {
+            RandomizerState()
+        }
+    }
+
+    private fun saveRandomizerStateToDisk(state: RandomizerState) {
+        try {
+            randomizerFile.writeText(gson.toJson(state))
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
     private data class JsonWordPack(
         val name: String,
         val words: List<JsonWordEntry> = emptyList(),
@@ -420,3 +480,10 @@ class LocalDataManager(private val context: Context) {
         val clue: String? = null,
     )
 }
+
+data class RandomizerState(
+    val globalRoundCounter: Int = 0,
+    val wordUsageHistory: Map<String, Int> = emptyMap(),
+    val playerImposterCounts: Map<String, Int> = emptyMap(),
+    val recentImposterNames: List<List<String>> = emptyList(),
+)

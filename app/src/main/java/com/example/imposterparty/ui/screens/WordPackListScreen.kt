@@ -18,7 +18,9 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -69,6 +71,61 @@ fun WordPackListScreen(
             }
             matchesSearch && matchesFilter
         }
+    }
+
+    var showResetWeightageDialog by remember { mutableStateOf(false) }
+
+    // Reset Weightage confirmation dialog (Deep Space theme)
+    if (showResetWeightageDialog) {
+        AlertDialog(
+            onDismissRequest = { showResetWeightageDialog = false },
+            containerColor = StitchSurfaceContainer,
+            shape = RoundedCornerShape(20.dp),
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.Refresh,
+                        contentDescription = null,
+                        tint = NeonCyan,
+                        modifier = Modifier.size(24.dp),
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        "Reset Randomizer Weightage",
+                        style = MaterialTheme.typography.titleLarge.copy(
+                            fontWeight = FontWeight.Bold,
+                        ),
+                        color = Color.White,
+                    )
+                }
+            },
+            text = {
+                Text(
+                    "This will reset all secret word cooldowns and player imposter frequency counters back to default equal weights across all matches.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = OnSurfaceVariant,
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        gameViewModel.resetRandomizerWeightage()
+                        showResetWeightageDialog = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = NeonPurple),
+                    shape = RoundedCornerShape(12.dp),
+                ) {
+                    Text("Reset Weights", color = Color.White, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showResetWeightageDialog = false },
+                ) {
+                    Text("Cancel", color = OnSurfaceVariant, fontWeight = FontWeight.Bold)
+                }
+            },
+        )
     }
 
     // Delete confirmation dialog (Deep Space theme)
@@ -156,6 +213,25 @@ fun WordPackListScreen(
                     color = PrimaryContainerNeon,
                     modifier = Modifier.weight(1f),
                 )
+
+                // "Reset Weights" Button
+                IconButton(
+                    onClick = { showResetWeightageDialog = true },
+                    modifier = Modifier
+                        .size(38.dp)
+                        .clip(CircleShape)
+                        .background(StitchSurfaceContainerHigh.copy(alpha = 0.6f))
+                        .border(BorderStroke(1.dp, OutlineSubtle.copy(alpha = 0.3f)), CircleShape),
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Refresh,
+                        contentDescription = "Reset Randomizer Weights",
+                        tint = NeonCyan,
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
+
+                Spacer(Modifier.width(8.dp))
 
                 // "+ New Pack" Button
                 Button(

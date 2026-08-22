@@ -48,9 +48,9 @@ fun CardRevealScreen(
     var hasCurrentPlayerOpenedCard by remember(gameState.currentRevealIndex) { mutableStateOf(false) }
     val haptic = LocalHapticFeedback.current
 
-    // Watch for phase transition to Discussion
+    // Watch for phase transition to Discussion or Sub-Round Discussion
     LaunchedEffect(gameState.phase) {
-        if (gameState.phase == GamePhase.DISCUSSION) {
+        if (gameState.phase == GamePhase.DISCUSSION || gameState.phase == GamePhase.SUB_ROUND_DISCUSSION) {
             onAllRevealed()
         }
     }
@@ -95,28 +95,32 @@ fun CardRevealScreen(
                 .fillMaxSize()
                 .padding(horizontal = 20.dp),
         ) {
-            // ── Top Header / Progress ──
-            Spacer(Modifier.height(16.dp))
+            val totalRevealCount = if (gameState.revealOrder.isNotEmpty()) gameState.revealOrder.size else gameState.players.size
+            val currentRevealNum = (gameState.currentRevealIndex + 1).coerceAtMost(totalRevealCount)
 
             Text(
-                text = "PLAYER ${gameState.currentRevealIndex + 1} OF ${gameState.players.size}",
+                text = if (gameState.isSubRound) {
+                    "SUB-ROUND ${gameState.subRoundNumber} • PLAYER $currentRevealNum OF $totalRevealCount"
+                } else {
+                    "PLAYER $currentRevealNum OF $totalRevealCount"
+                },
                 style = MaterialTheme.typography.labelSmall.copy(
                     fontWeight = FontWeight.Bold,
                     letterSpacing = 2.sp,
                     fontSize = 12.sp,
                 ),
-                color = PrimaryContainerNeon,
+                color = if (gameState.isSubRound) WarningYellow else PrimaryContainerNeon,
             )
 
             Spacer(Modifier.height(8.dp))
 
             LinearProgressIndicator(
-                progress = { (gameState.currentRevealIndex.toFloat() + 1f) / gameState.players.size.coerceAtLeast(1) },
+                progress = { currentRevealNum.toFloat() / totalRevealCount.coerceAtLeast(1) },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(4.dp)
                     .clip(RoundedCornerShape(2.dp)),
-                color = NeonPurple,
+                color = if (gameState.isSubRound) DangerRed else NeonPurple,
                 trackColor = StitchSurfaceContainerHigh,
             )
 
@@ -409,8 +413,9 @@ fun CardRevealScreen(
                 )
                 .padding(horizontal = 20.dp, vertical = 16.dp),
         ) {
+            val totalRevealCount = if (gameState.revealOrder.isNotEmpty()) gameState.revealOrder.size else gameState.players.size
             val isReady = hasCurrentPlayerOpenedCard
-            val isLastPlayer = gameState.currentRevealIndex >= gameState.players.size - 1
+            val isLastPlayer = gameState.currentRevealIndex >= totalRevealCount - 1
 
             Button(
                 onClick = {
@@ -454,7 +459,9 @@ fun CardRevealScreen(
                         horizontalArrangement = Arrangement.Center,
                     ) {
                         Text(
-                            text = if (isLastPlayer) "Start Discussion" else "Next Player",
+                            text = if (isLastPlayer) {
+                                if (gameState.isSubRound) "Start Sub-Round Discussion" else "Start Discussion"
+                            } else "Next Player",
                             style = MaterialTheme.typography.titleMedium.copy(
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 16.sp,

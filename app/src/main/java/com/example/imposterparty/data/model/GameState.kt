@@ -22,12 +22,15 @@ data class GameState(
     val accusedPlayerId: Int? = null,
     val isImposterFound: Boolean = false,
     // ── Final Imposter & Sub-Round fields ──
+    val subRoundNumber: Int = 0,
     val eliminatedPlayerIds: List<Int> = emptyList(),
     val remainingImposterId: Int? = null,
+    val volunteerImposterId: Int? = null,
     val imposterGuessWord: String? = null,
     val wasWordGuessedCorrectly: Boolean? = null,
     val finalPhaseDescription: String? = null,
     val pendingRoundScores: Map<String, Int> = emptyMap(),
+    val imposterSecuredPoints: Map<Int, Int> = emptyMap(), // imposterPlayerId -> points secured from surviving rounds
     val isSubRound: Boolean = false,
     val subRoundVoterIndices: List<Int> = emptyList(),
 )

@@ -179,23 +179,8 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
 
-            // Retrieve match session and completed round history for fairness calculation
-            val existingMatches = dataManager.allMatches.first()
-            val currentMatch = existingMatches.find { it.id == currentMatchId }
-            val completedRounds = currentMatch?.rounds ?: emptyList()
-
-            // Build global word usage history for anti-repetition cooldown
-            val allHistoryList = dataManager.allHistory.first()
-            val wordUsageHistory = mutableMapOf<String, Int>()
-            allHistoryList.forEach { rec ->
-                if (rec.secretWord.isNotBlank()) {
-                    val norm = com.example.imposterparty.data.randomizer.FairRandomizer.normalizeWord(rec.secretWord)
-                    val prev = wordUsageHistory[norm] ?: -1
-                    if (rec.roundNumber > prev) {
-                        wordUsageHistory[norm] = rec.roundNumber
-                    }
-                }
-            }
+            // Retrieve universal persistent RandomizerState for cross-match dynamic fairness
+            val randomizerState = dataManager.getRandomizerState()
 
             // Category & Word Selection using Fair Randomizer (cooldown + shuffle-bag + fallback)
             val availablePackIds: List<Long> = if (settings.selectedCategoryIds.isNotEmpty()) {
@@ -204,19 +189,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 wordPacks.value.map { it.id }
             }
 
-            val categoryLastUsed = mutableMapOf<Long, Int>()
-            completedRounds.forEach { round ->
-                val matchedPack = wordPacks.value.find { it.name.equals(round.categoryName, ignoreCase = true) }
-                if (matchedPack != null) {
-                    categoryLastUsed[matchedPack.id] = round.roundNumber
-                }
-            }
-
-            val chosenPackId = com.example.imposterparty.data.randomizer.FairRandomizer.selectCategory(
-                availablePackIds = availablePackIds,
-                categoryLastUsedRound = categoryLastUsed,
-                currentRound = state.roundNumber,
-            )
+            val chosenPackId = availablePackIds.randomOrNull() ?: wordPacks.value.firstOrNull()?.id ?: 1L
 
             val candidateEntries = dataManager.getEntriesForPackOnce(chosenPackId).ifEmpty {
                 availablePackIds.flatMap { dataManager.getEntriesForPackOnce(it) }
@@ -228,16 +201,16 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
 
             val selectedEntry = com.example.imposterparty.data.randomizer.FairRandomizer.selectSecretWord(
                 candidateEntries = candidateEntries,
-                wordUsageHistory = wordUsageHistory,
-                currentRound = state.roundNumber,
+                wordUsageHistory = randomizerState.wordUsageHistory,
+                currentRound = randomizerState.globalRoundCounter + 1,
             )
             val categoryName = dataManager.getPackById(selectedEntry.packId)?.name ?: ""
 
-            // Fair Imposter Selection (hard 3-streak exclusion, soft 2-streak penalty, recency + match lifetime balance)
-            val playerHistories = com.example.imposterparty.data.randomizer.FairRandomizer.buildPlayerHistories(
+            // Universal Fair Imposter Selection across ALL matches
+            val playerHistories = com.example.imposterparty.data.randomizer.FairRandomizer.buildPlayerHistoriesFromState(
                 players = players,
-                completedRounds = completedRounds,
-                currentRoundNumber = state.roundNumber,
+                playerImposterCounts = randomizerState.playerImposterCounts,
+                recentImposterRounds = randomizerState.recentImposterNames,
             )
 
             val imposterIndices = com.example.imposterparty.data.randomizer.FairRandomizer.selectImposters(
@@ -302,17 +275,24 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
 
         if (currentIdx >= revealOrder.size) return
 
-        val playerIdx = revealOrder[currentIdx]
-        val updatedPlayers = state.players.toMutableList()
-        updatedPlayers[playerIdx] = updatedPlayers[playerIdx].copy(hasRevealed = true)
+        val playerId = revealOrder[currentIdx]
+        val updatedPlayers = state.players.map { player ->
+            if (player.id == playerId) player.copy(hasRevealed = true) else player
+        }
 
         val nextIndex = currentIdx + 1
         val allRevealed = nextIndex >= revealOrder.size
 
+        val nextPhase = if (allRevealed) {
+            if (state.isSubRound) GamePhase.SUB_ROUND_DISCUSSION else GamePhase.DISCUSSION
+        } else {
+            GamePhase.REVEALING
+        }
+
         val newState = state.copy(
             players = updatedPlayers,
             currentRevealIndex = nextIndex,
-            phase = if (allRevealed) GamePhase.DISCUSSION else GamePhase.REVEALING,
+            phase = nextPhase,
         )
         _gameState.value = newState
         persistCurrentState(newState)
@@ -326,7 +306,8 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         val state = _gameState.value
         val idx = state.currentRevealIndex
         if (idx >= state.revealOrder.size) return null
-        return state.players[state.revealOrder[idx]]
+        val playerId = state.revealOrder[idx]
+        return state.players.find { it.id == playerId }
     }
 
     // ── Discussion Phase ───────────────────────────────────
@@ -371,11 +352,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
 
     fun getActivePlayers(): List<Player> {
         val state = _gameState.value
-        return if (state.isSubRound) {
-            state.players.filter { it.id !in state.eliminatedPlayerIds }
-        } else {
-            state.players
-        }
+        return state.players.filter { it.id !in state.eliminatedPlayerIds }
     }
 
     fun getCurrentVoter(): Player? {
@@ -437,184 +414,187 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         val accusedPlayer = state.players.find { it.id == accusedId }
         val isAccusedImposter = accusedPlayer?.role == Role.IMPOSTER
         val allImposters = state.players.filter { it.role == Role.IMPOSTER }
+        val updatedEliminated = listOf(accusedId)
+        val remainingImposters = allImposters.filter { it.id !in updatedEliminated }
+
+        // Update secured points: every imposter who survived this main round secures +1 point
+        val updatedSecured = state.imposterSecuredPoints.toMutableMap()
+        remainingImposters.forEach { imposter ->
+            updatedSecured[imposter.id] = (updatedSecured[imposter.id] ?: 0) + 1
+        }
 
         val roundScoresMap = mutableMapOf<String, Int>()
 
-        // Two-Imposter / Multi-Imposter Rule Resolution:
-        if (allImposters.size >= 2) {
-            if (!isAccusedImposter) {
-                // All imposters survived -> Imposters Win!
-                allImposters.forEach { imposter ->
-                    roundScoresMap[imposter.name] = 1
-                }
-                state.players.filter { it.role == Role.CIVILIAN }.forEach { civilian ->
-                    val votedForId = state.votes[civilian.id]
-                    val votedForPlayer = state.players.find { it.id == votedForId }
-                    val votedForAnImposter = votedForPlayer?.role == Role.IMPOSTER
-                    roundScoresMap[civilian.name] = if (votedForAnImposter) 1 else 0
-                }
-                val newState = state.copy(
-                    phase = GamePhase.RESULT,
-                    accusedPlayerId = accusedId,
-                    isImposterFound = false,
-                    eliminatedPlayerIds = listOf(accusedId),
-                    finalPhaseDescription = "Both Imposters Survived!",
-                    pendingRoundScores = roundScoresMap,
-                )
-                _gameState.value = newState
-                persistCurrentState(newState)
-                saveRoundScores(isCivilianWin = false, roundScoresMap = roundScoresMap)
-            } else {
-                // Exactly one imposter eliminated:
-                val survivingImposters = allImposters.filter { it.id != accusedId }
-                if (survivingImposters.size == 1) {
-                    val remainingImposter = survivingImposters.first()
-                    // Pending bonus points for voting the eliminated imposter:
-                    state.players.filter { it.role == Role.CIVILIAN }.forEach { civilian ->
-                        val votedForId = state.votes[civilian.id]
-                        val votedForEliminatedImposter = (votedForId == accusedId)
-                        roundScoresMap[civilian.name] = if (votedForEliminatedImposter) 1 else 0
-                    }
-                    roundScoresMap[accusedPlayer.name] = 0
-                    roundScoresMap[remainingImposter.name] = 0
-
-                    // Enter Final Imposter Phase!
-                    val newState = state.copy(
-                        phase = GamePhase.FINAL_IMPOSTER_CHOICE,
-                        accusedPlayerId = accusedId,
-                        isImposterFound = true,
-                        eliminatedPlayerIds = listOf(accusedId),
-                        remainingImposterId = remainingImposter.id,
-                        finalPhaseDescription = "${accusedPlayer?.name ?: "Imposter"} was eliminated! 1 Imposter remains.",
-                        pendingRoundScores = roundScoresMap,
-                    )
-                    _gameState.value = newState
-                    persistCurrentState(newState)
-                } else {
-                    // All imposters eliminated -> Civilians Win!
-                    state.players.forEach { player ->
-                        if (player.role == Role.CIVILIAN) {
-                            val votedForId = state.votes[player.id]
-                            val votedForEliminatedImposter = isAccusedImposter && (votedForId == accusedId)
-                            // Base 1 point for Civilians winning + 1 bonus if voted for eliminated imposter
-                            roundScoresMap[player.name] = if (votedForEliminatedImposter) 2 else 1
-                        } else {
-                            roundScoresMap[player.name] = 0
-                        }
-                    }
-                    val newState = state.copy(
-                        phase = GamePhase.RESULT,
-                        accusedPlayerId = accusedId,
-                        isImposterFound = true,
-                        eliminatedPlayerIds = listOf(accusedId),
-                        finalPhaseDescription = "All Imposters Were Eliminated!",
-                        pendingRoundScores = roundScoresMap,
-                    )
-                    _gameState.value = newState
-                    persistCurrentState(newState)
-                    saveRoundScores(isCivilianWin = true, roundScoresMap = roundScoresMap)
-                }
+        if (!isAccusedImposter) {
+            // Civilian was accused -> Imposters Win immediately!
+            allImposters.forEach { imposter ->
+                val isSurviving = imposter.id !in updatedEliminated
+                val secured = updatedSecured[imposter.id] ?: 0
+                // Surviving winning imposters get +1 bonus point on top of their secured points
+                roundScoresMap[imposter.name] = if (isSurviving) secured + 1 else secured
             }
+            state.players.filter { it.role == Role.CIVILIAN }.forEach { civilian ->
+                val votedForId = state.votes[civilian.id]
+                val votedForPlayer = state.players.find { it.id == votedForId }
+                val votedForAnImposter = votedForPlayer?.role == Role.IMPOSTER
+                roundScoresMap[civilian.name] = if (votedForAnImposter) 1 else 0
+            }
+            val newState = state.copy(
+                phase = GamePhase.RESULT,
+                accusedPlayerId = accusedId,
+                isImposterFound = false,
+                eliminatedPlayerIds = updatedEliminated,
+                imposterSecuredPoints = updatedSecured,
+                finalPhaseDescription = "${accusedPlayer?.name ?: "A Civilian"} was eliminated! Imposters Win!",
+                pendingRoundScores = roundScoresMap,
+            )
+            _gameState.value = newState
+            persistCurrentState(newState)
+            saveRoundScores(isCivilianWin = false, roundScoresMap = roundScoresMap)
         } else {
-            // Single Imposter Game Resolution:
-            val singleImposter = allImposters.firstOrNull()
-            if (isAccusedImposter) {
-                // Civilians Win!
+            // An imposter was accused and eliminated!
+            if (remainingImposters.isEmpty()) {
+                // All imposters eliminated -> Civilians Win!
                 state.players.forEach { player ->
                     if (player.role == Role.CIVILIAN) {
                         val votedForId = state.votes[player.id]
                         val votedForEliminatedImposter = (votedForId == accusedId)
-                        // Base 1 point for Civilians winning + 1 bonus if voted for eliminated imposter (1+1=2)
-                        // Wrong voters get base 1 point, right voters get 2 points
+                        // Base 1 point for Civilians winning + 1 bonus if voted for eliminated imposter
                         roundScoresMap[player.name] = if (votedForEliminatedImposter) 2 else 1
                     } else {
-                        roundScoresMap[player.name] = 0
+                        roundScoresMap[player.name] = updatedSecured[player.id] ?: 0
                     }
                 }
                 val newState = state.copy(
                     phase = GamePhase.RESULT,
                     accusedPlayerId = accusedId,
                     isImposterFound = true,
-                    eliminatedPlayerIds = listOf(accusedId),
-                    finalPhaseDescription = "Imposter Was Caught!",
+                    eliminatedPlayerIds = updatedEliminated,
+                    imposterSecuredPoints = updatedSecured,
+                    finalPhaseDescription = "All Imposters Were Eliminated! Civilians Win!",
                     pendingRoundScores = roundScoresMap,
                 )
                 _gameState.value = newState
                 persistCurrentState(newState)
                 saveRoundScores(isCivilianWin = true, roundScoresMap = roundScoresMap)
             } else {
-                // Imposter Wins!
-                if (singleImposter != null) {
-                    roundScoresMap[singleImposter.name] = 1
-                }
+                // Other imposter(s) remain -> Enter Imposter Choice Phase (Guess Word or Sub-Round)!
                 state.players.filter { it.role == Role.CIVILIAN }.forEach { civilian ->
                     val votedForId = state.votes[civilian.id]
-                    val votedForPlayer = state.players.find { it.id == votedForId }
-                    val votedForAnImposter = votedForPlayer?.role == Role.IMPOSTER
-                    roundScoresMap[civilian.name] = if (votedForAnImposter) 1 else 0
+                    val votedForEliminatedImposter = (votedForId == accusedId)
+                    roundScoresMap[civilian.name] = if (votedForEliminatedImposter) 1 else 0
                 }
+                allImposters.forEach { imposter ->
+                    roundScoresMap[imposter.name] = updatedSecured[imposter.id] ?: 0
+                }
+
                 val newState = state.copy(
-                    phase = GamePhase.RESULT,
+                    phase = GamePhase.FINAL_IMPOSTER_CHOICE,
                     accusedPlayerId = accusedId,
-                    isImposterFound = false,
-                    eliminatedPlayerIds = listOf(accusedId),
-                    finalPhaseDescription = "Imposter Escaped Unnoticed!",
+                    isImposterFound = true,
+                    eliminatedPlayerIds = updatedEliminated,
+                    imposterSecuredPoints = updatedSecured,
+                    remainingImposterId = remainingImposters.first().id,
+                    finalPhaseDescription = "${accusedPlayer?.name ?: "An Imposter"} was eliminated! ${remainingImposters.size} Imposter(s) remain.",
                     pendingRoundScores = roundScoresMap,
                 )
                 _gameState.value = newState
                 persistCurrentState(newState)
-                saveRoundScores(isCivilianWin = false, roundScoresMap = roundScoresMap)
             }
         }
     }
 
-    // ── Final Imposter Phase Handlers ──────────────────────
+    // ── Imposter Guess / Sub-Round Phase Handlers ──────────
 
-    fun submitImposterWordGuess(guess: String) {
+    fun submitImposterWordGuess(guess: String, volunteerPlayerId: Int? = null) {
         val state = _gameState.value
         val normalizedGuess = com.example.imposterparty.data.randomizer.FairRandomizer.normalizeWord(guess)
         val normalizedSecret = com.example.imposterparty.data.randomizer.FairRandomizer.normalizeWord(state.secretWord)
         val isCorrect = normalizedGuess == normalizedSecret
 
+        val activeImposters = state.players.filter { it.role == Role.IMPOSTER && it.id !in state.eliminatedPlayerIds }
+        val volunteer = (if (volunteerPlayerId != null) state.players.find { it.id == volunteerPlayerId } else null)
+            ?: state.players.find { it.id == state.remainingImposterId }
+            ?: activeImposters.firstOrNull()
+
+        // Volunteer imposter who guesses is eliminated at that time
+        val updatedEliminated = if (volunteer != null) {
+            (state.eliminatedPlayerIds + volunteer.id).distinct()
+        } else {
+            state.eliminatedPlayerIds
+        }
+
+        val allImposters = state.players.filter { it.role == Role.IMPOSTER }
+        val remainingImposters = allImposters.filter { it.id !in updatedEliminated }
+
         val finalScores = mutableMapOf<String, Int>()
-        val survivingImposter = state.players.find { it.id == state.remainingImposterId }
 
         if (isCorrect) {
-            // Imposter Wins via Guess: Receives +3 total points (+2 hidden survival + +1 victory value)
-            if (survivingImposter != null) {
-                finalScores[survivingImposter.name] = 3
+            // Volunteer gets +3 points instantly
+            allImposters.forEach { imposter ->
+                val secured = state.imposterSecuredPoints[imposter.id] ?: 0
+                finalScores[imposter.name] = if (imposter.id == volunteer?.id) secured + 3 else secured
             }
             state.players.filter { it.role == Role.CIVILIAN }.forEach { civilian ->
                 val priorBonus = state.pendingRoundScores.getOrDefault(civilian.name, 0)
-                finalScores[civilian.name] = priorBonus
+                finalScores[civilian.name] = if (priorBonus > 0) 1 else 0
             }
-            val newState = state.copy(
-                phase = GamePhase.RESULT,
-                isImposterFound = false,
-                imposterGuessWord = guess.trim(),
-                wasWordGuessedCorrectly = true,
-                finalPhaseDescription = "${survivingImposter?.name ?: "Imposter"} correctly guessed the secret word!",
-                pendingRoundScores = finalScores,
-            )
-            _gameState.value = newState
-            persistCurrentState(newState)
-            saveRoundScores(isCivilianWin = false, roundScoresMap = finalScores)
+
+            if (remainingImposters.isEmpty()) {
+                // Round Ends
+                val newState = state.copy(
+                    phase = GamePhase.RESULT,
+                    isImposterFound = false,
+                    eliminatedPlayerIds = updatedEliminated,
+                    volunteerImposterId = volunteer?.id,
+                    imposterGuessWord = guess.trim(),
+                    wasWordGuessedCorrectly = true,
+                    finalPhaseDescription = "${volunteer?.name ?: "Imposter"} correctly guessed \"${state.secretWord}\" (+3 pts)!",
+                    pendingRoundScores = finalScores,
+                )
+                _gameState.value = newState
+                persistCurrentState(newState)
+                saveRoundScores(isCivilianWin = false, roundScoresMap = finalScores)
+            } else {
+                // More imposters remain -> continue with remaining imposters
+                val updatedPending = state.pendingRoundScores.toMutableMap()
+                if (volunteer != null) {
+                    val secured = state.imposterSecuredPoints[volunteer.id] ?: 0
+                    updatedPending[volunteer.name] = secured + 3
+                }
+                val newState = state.copy(
+                    phase = GamePhase.FINAL_IMPOSTER_CHOICE,
+                    isImposterFound = false,
+                    eliminatedPlayerIds = updatedEliminated,
+                    volunteerImposterId = volunteer?.id,
+                    remainingImposterId = remainingImposters.first().id,
+                    imposterGuessWord = guess.trim(),
+                    wasWordGuessedCorrectly = true,
+                    finalPhaseDescription = "${volunteer?.name ?: "An Imposter"} guessed correctly (+3 pts) and exited! ${remainingImposters.size} Imposter(s) remain.",
+                    pendingRoundScores = updatedPending,
+                )
+                _gameState.value = newState
+                persistCurrentState(newState)
+            }
         } else {
-            // Civilians Win (Imposter Guessed Wrong)
-            if (survivingImposter != null) {
-                finalScores[survivingImposter.name] = 0
+            // Volunteer Guessed Wrong -> Civilians Win!
+            allImposters.forEach { imposter ->
+                finalScores[imposter.name] = state.imposterSecuredPoints[imposter.id] ?: 0
             }
             state.players.filter { it.role == Role.CIVILIAN }.forEach { civilian ->
                 val priorBonus = state.pendingRoundScores.getOrDefault(civilian.name, 0)
-                // Base 1 point for Civilians winning + prior correct vote bonus
-                finalScores[civilian.name] = 1 + priorBonus
+                // Civilians win base 1 pt + 1 bonus if they voted for an imposter earlier
+                finalScores[civilian.name] = 1 + (if (priorBonus > 0) 1 else 0)
             }
+
             val newState = state.copy(
                 phase = GamePhase.RESULT,
                 isImposterFound = true,
+                eliminatedPlayerIds = updatedEliminated,
+                volunteerImposterId = volunteer?.id,
                 imposterGuessWord = guess.trim(),
                 wasWordGuessedCorrectly = false,
-                finalPhaseDescription = "${survivingImposter?.name ?: "Imposter"} guessed \"${guess.trim()}\" (Word was \"${state.secretWord}\")",
+                finalPhaseDescription = "${volunteer?.name ?: "Imposter"} guessed incorrectly! Civilians Win!",
                 pendingRoundScores = finalScores,
             )
             _gameState.value = newState
@@ -625,41 +605,85 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
 
     fun startSubRound() {
         countDownTimer?.cancel()
-        val state = _gameState.value
-        val timerSeconds = if (state.settings.isTimerEnabled) {
-            when (state.settings.timerDuration) {
-                TimerDuration.CUSTOM -> state.settings.customTimerSeconds
-                else -> state.settings.timerDuration.seconds
+        viewModelScope.launch {
+            val state = _gameState.value
+            val settings = state.settings
+            val activePlayers = state.players.filter { it.id !in state.eliminatedPlayerIds }
+
+            // Pick a new secret word from chosen packs, avoiding the current secret word
+            val availablePackIds: List<Long> = if (settings.selectedCategoryIds.isNotEmpty()) {
+                settings.selectedCategoryIds.toList()
+            } else {
+                wordPacks.value.map { it.id }
             }
-        } else {
-            0
-        }
+            val candidateEntries = availablePackIds.flatMap { dataManager.getEntriesForPackOnce(it) }
+                .ifEmpty { wordPacks.value.flatMap { dataManager.getEntriesForPackOnce(it.id) } }
+            val randomizerState = dataManager.getRandomizerState()
+            val chosenEntry = if (candidateEntries.isNotEmpty()) {
+                com.example.imposterparty.data.randomizer.FairRandomizer.selectSecretWord(
+                    candidateEntries = candidateEntries,
+                    wordUsageHistory = randomizerState.wordUsageHistory,
+                    currentRound = randomizerState.globalRoundCounter + 1,
+                )
+            } else null
 
-        val resetPlayers = state.players.map { player ->
-            player.copy(hasVoted = false, votedForId = null)
-        }
+            val newSecretWord = chosenEntry?.word ?: state.secretWord
+            val newSecretClue = chosenEntry?.clue ?: state.secretClue
+            val newCategoryName = if (chosenEntry != null) {
+                dataManager.getPackById(chosenEntry.packId)?.name ?: state.categoryName
+            } else {
+                state.categoryName
+            }
 
-        val newState = state.copy(
-            phase = GamePhase.SUB_ROUND_DISCUSSION,
-            isSubRound = true,
-            players = resetPlayers,
-            votes = emptyMap(),
-            currentVoterIndex = 0,
-            timerRemainingSeconds = timerSeconds,
-            isTimerRunning = false,
-        )
-        _gameState.value = newState
-        persistCurrentState(newState)
+            val timerSeconds = if (state.settings.isTimerEnabled) {
+                when (state.settings.timerDuration) {
+                    TimerDuration.CUSTOM -> state.settings.customTimerSeconds
+                    else -> state.settings.timerDuration.seconds
+                }
+            } else {
+                0
+            }
 
-        if (state.settings.isTimerEnabled) {
-            startTimer()
+            val resetPlayers = state.players.map { player ->
+                if (player.id in state.eliminatedPlayerIds) {
+                    player
+                } else {
+                    player.copy(hasRevealed = false, hasVoted = false, votedForId = null)
+                }
+            }
+
+            val revealOrder = activePlayers.map { it.id }
+            val startingSpeaker = activePlayers.randomOrNull()?.id ?: 0
+
+            val newState = state.copy(
+                phase = GamePhase.REVEALING,
+                isSubRound = true,
+                subRoundNumber = state.subRoundNumber + 1,
+                secretWord = newSecretWord,
+                secretClue = newSecretClue,
+                categoryName = newCategoryName,
+                players = resetPlayers,
+                revealOrder = revealOrder,
+                currentRevealIndex = 0,
+                startingSpeakerIndex = startingSpeaker,
+                votes = emptyMap(),
+                currentVoterIndex = 0,
+                timerRemainingSeconds = timerSeconds,
+                isTimerRunning = false,
+            )
+            _gameState.value = newState
+            persistCurrentState(newState)
         }
     }
 
     fun endSubRoundDiscussion() {
         countDownTimer?.cancel()
         val resetPlayers = _gameState.value.players.map { player ->
-            player.copy(hasVoted = false, votedForId = null)
+            if (player.id in _gameState.value.eliminatedPlayerIds) {
+                player
+            } else {
+                player.copy(hasVoted = false, votedForId = null)
+            }
         }
         val newState = _gameState.value.copy(
             phase = GamePhase.SUB_ROUND_VOTING,
@@ -683,61 +707,98 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         val topVoted = voteCounts.filter { it.value == maxVotes }.keys.toList()
         val subAccusedId = topVoted.random()
 
-        val remainingImposterId = state.remainingImposterId
-        val isRemainingImposterEliminated = subAccusedId == remainingImposterId
-        val survivingImposter = state.players.find { it.id == remainingImposterId }
         val subAccusedPlayer = state.players.find { it.id == subAccusedId }
+        val isSubAccusedImposter = subAccusedPlayer?.role == Role.IMPOSTER
+        val updatedEliminated = (state.eliminatedPlayerIds + subAccusedId).distinct()
+
+        val allImposters = state.players.filter { it.role == Role.IMPOSTER }
+        val remainingImposters = allImposters.filter { it.id !in updatedEliminated }
+
+        // Update secured points: every imposter who survived this sub-round secures +1 point
+        val updatedSecured = state.imposterSecuredPoints.toMutableMap()
+        remainingImposters.forEach { imposter ->
+            updatedSecured[imposter.id] = (updatedSecured[imposter.id] ?: 0) + 1
+        }
 
         val finalScores = mutableMapOf<String, Int>()
 
-        if (isRemainingImposterEliminated) {
-            // Civilians Win Sub-Round!
-            if (survivingImposter != null) {
-                finalScores[survivingImposter.name] = 0
+        if (!isSubAccusedImposter) {
+            // Rule 1: Civilian was accused in sub-round -> Round ends immediately and Imposters Win!
+            allImposters.forEach { imposter ->
+                val isSurviving = imposter.id !in updatedEliminated
+                val secured = updatedSecured[imposter.id] ?: 0
+                finalScores[imposter.name] = if (isSurviving) secured + 1 else secured
             }
             state.players.filter { it.role == Role.CIVILIAN }.forEach { civilian ->
                 val priorBonus = state.pendingRoundScores.getOrDefault(civilian.name, 0)
-                val subVoteId = state.votes[civilian.id]
-                val votedForSurvivingImposter = (subVoteId == remainingImposterId)
-                val subBonus = if (votedForSurvivingImposter) 1 else 0
+                finalScores[civilian.name] = if (priorBonus > 0) 1 else 0
+            }
 
-                // Base 1 point for Civilians winning + bonus from main round or sub-round
-                finalScores[civilian.name] = 1 + (if (priorBonus > 0 || subBonus > 0) 1 else 0)
-            }
-            val newState = state.copy(
-                phase = GamePhase.RESULT,
-                accusedPlayerId = subAccusedId,
-                isImposterFound = true,
-                eliminatedPlayerIds = state.eliminatedPlayerIds + subAccusedId,
-                finalPhaseDescription = "${survivingImposter?.name ?: "Remaining Imposter"} was eliminated in the Sub-Round!",
-                pendingRoundScores = finalScores,
-            )
-            _gameState.value = newState
-            persistCurrentState(newState)
-            saveRoundScores(isCivilianWin = true, roundScoresMap = finalScores)
-        } else {
-            // Imposter Wins Sub-Round! Receives +3 total points (+2 hidden survival + +1 victory value)
-            if (survivingImposter != null) {
-                finalScores[survivingImposter.name] = 3
-            }
-            state.players.filter { it.role == Role.CIVILIAN }.forEach { civilian ->
-                val priorBonus = state.pendingRoundScores.getOrDefault(civilian.name, 0)
-                val subVoteId = state.votes[civilian.id]
-                val votedForSurvivingImposter = (subVoteId == remainingImposterId)
-                val subBonus = if (votedForSurvivingImposter) 1 else 0
-                finalScores[civilian.name] = (if (priorBonus > 0 || subBonus > 0) 1 else 0)
-            }
             val newState = state.copy(
                 phase = GamePhase.RESULT,
                 accusedPlayerId = subAccusedId,
                 isImposterFound = false,
-                eliminatedPlayerIds = state.eliminatedPlayerIds + subAccusedId,
-                finalPhaseDescription = "${survivingImposter?.name ?: "Remaining Imposter"} survived the Sub-Round!",
+                eliminatedPlayerIds = updatedEliminated,
+                imposterSecuredPoints = updatedSecured,
+                finalPhaseDescription = "${subAccusedPlayer?.name ?: "A Civilian"} was eliminated in Sub-Round ${state.subRoundNumber}! Imposters Win!",
                 pendingRoundScores = finalScores,
             )
             _gameState.value = newState
             persistCurrentState(newState)
             saveRoundScores(isCivilianWin = false, roundScoresMap = finalScores)
+        } else {
+            // An imposter was accused in sub-round!
+            if (remainingImposters.isEmpty()) {
+                // All imposters eliminated -> Civilians Win!
+                state.players.forEach { player ->
+                    if (player.role == Role.CIVILIAN) {
+                        val priorBonus = state.pendingRoundScores.getOrDefault(player.name, 0)
+                        val subVoteId = state.votes[player.id]
+                        val votedForAccusedImposter = (subVoteId == subAccusedId)
+                        val subBonus = if (votedForAccusedImposter) 1 else 0
+                        finalScores[player.name] = 1 + (if (priorBonus > 0 || subBonus > 0) 1 else 0)
+                    } else {
+                        finalScores[player.name] = updatedSecured[player.id] ?: 0
+                    }
+                }
+                val newState = state.copy(
+                    phase = GamePhase.RESULT,
+                    accusedPlayerId = subAccusedId,
+                    isImposterFound = true,
+                    eliminatedPlayerIds = updatedEliminated,
+                    imposterSecuredPoints = updatedSecured,
+                    finalPhaseDescription = "All Imposters Were Eliminated in Sub-Round ${state.subRoundNumber}! Civilians Win!",
+                    pendingRoundScores = finalScores,
+                )
+                _gameState.value = newState
+                persistCurrentState(newState)
+                saveRoundScores(isCivilianWin = true, roundScoresMap = finalScores)
+            } else {
+                // Other imposter(s) remain -> Enter Imposter Choice Phase for next sub-round!
+                val updatedPending = state.pendingRoundScores.toMutableMap()
+                state.players.filter { it.role == Role.CIVILIAN }.forEach { civilian ->
+                    val subVoteId = state.votes[civilian.id]
+                    if (subVoteId == subAccusedId) {
+                        updatedPending[civilian.name] = 1
+                    }
+                }
+                allImposters.forEach { imposter ->
+                    updatedPending[imposter.name] = updatedSecured[imposter.id] ?: 0
+                }
+
+                val newState = state.copy(
+                    phase = GamePhase.FINAL_IMPOSTER_CHOICE,
+                    accusedPlayerId = subAccusedId,
+                    isImposterFound = true,
+                    eliminatedPlayerIds = updatedEliminated,
+                    imposterSecuredPoints = updatedSecured,
+                    remainingImposterId = remainingImposters.first().id,
+                    finalPhaseDescription = "${subAccusedPlayer?.name ?: "An Imposter"} was eliminated in Sub-Round ${state.subRoundNumber}! ${remainingImposters.size} Imposter(s) remain.",
+                    pendingRoundScores = updatedPending,
+                )
+                _gameState.value = newState
+                persistCurrentState(newState)
+            }
         }
     }
 
@@ -796,6 +857,10 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             )
 
             dataManager.saveScoresAndHistory(scoreRecords, historyRecord)
+            dataManager.recordRoundPlayed(
+                secretWord = state.secretWord,
+                imposterNames = state.players.filter { it.role == Role.IMPOSTER }.map { it.name }
+            )
             dataManager.saveMatchSession(updatedMatch)
             dataManager.saveLastPlayerNames(state.players.map { it.name })
         }
@@ -817,12 +882,15 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             currentVoterIndex = 0,
             startingSpeakerIndex = 0,
             isTimerRunning = false,
+            subRoundNumber = 0,
             eliminatedPlayerIds = emptyList(),
             remainingImposterId = null,
+            volunteerImposterId = null,
             imposterGuessWord = null,
             wasWordGuessedCorrectly = null,
             finalPhaseDescription = null,
             pendingRoundScores = emptyMap(),
+            imposterSecuredPoints = emptyMap(),
             isSubRound = false,
             subRoundVoterIndices = emptyList(),
             players = state.players.map {
@@ -846,12 +914,15 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             currentVoterIndex = 0,
             startingSpeakerIndex = 0,
             isTimerRunning = false,
+            subRoundNumber = 0,
             eliminatedPlayerIds = emptyList(),
             remainingImposterId = null,
+            volunteerImposterId = null,
             imposterGuessWord = null,
             wasWordGuessedCorrectly = null,
             finalPhaseDescription = null,
             pendingRoundScores = emptyMap(),
+            imposterSecuredPoints = emptyMap(),
             isSubRound = false,
             subRoundVoterIndices = emptyList(),
             players = _gameState.value.players.map { p ->
@@ -904,6 +975,12 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     fun deleteWordPack(pack: WordPack) {
         viewModelScope.launch {
             dataManager.deleteWordPack(pack)
+        }
+    }
+
+    fun resetRandomizerWeightage() {
+        viewModelScope.launch {
+            dataManager.resetRandomizerWeightage()
         }
     }
 

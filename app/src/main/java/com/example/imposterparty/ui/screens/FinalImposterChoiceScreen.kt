@@ -5,7 +5,7 @@ import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -21,16 +21,15 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.imposterparty.data.model.Role
 import com.example.imposterparty.theme.*
 import com.example.imposterparty.viewmodel.GameViewModel
 
@@ -38,24 +37,32 @@ import com.example.imposterparty.viewmodel.GameViewModel
 fun FinalImposterChoiceScreen(
     gameViewModel: GameViewModel,
     onNavigateToResult: () -> Unit,
-    onNavigateToSubRoundDiscussion: () -> Unit,
+    onNavigateToSubRoundReveal: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val gameState by gameViewModel.gameState.collectAsStateWithLifecycle()
-    val survivingImposter = gameState.players.find { it.id == gameState.remainingImposterId }
-    val haptic = LocalHapticFeedback.current
     val focusManager = LocalFocusManager.current
 
-    var isRevealed by remember { mutableStateOf(false) }
-    var selectedMode by remember { mutableStateOf<ChoiceMode?>(null) }
+    val activePlayers = remember(gameState.players, gameState.eliminatedPlayerIds) {
+        gameState.players.filter { it.id !in gameState.eliminatedPlayerIds }
+    }
+    val activeImposters = remember(activePlayers) {
+        activePlayers.filter { it.role == Role.IMPOSTER }
+    }
+    val accusedPlayer = gameState.players.find { it.id == gameState.accusedPlayerId }
+
+    var isVolunteeringToGuess by remember { mutableStateOf(false) }
+    var selectedVolunteerId by remember(activeImposters) {
+        mutableStateOf<Int?>(activeImposters.firstOrNull()?.id)
+    }
     var wordGuessInput by remember { mutableStateOf("") }
 
     val infiniteTransition = rememberInfiniteTransition(label = "pulse")
     val pulseScale by infiniteTransition.animateFloat(
-        initialValue = 0.97f,
-        targetValue = 1.03f,
+        initialValue = 0.98f,
+        targetValue = 1.02f,
         animationSpec = infiniteRepeatable(
-            animation = tween(1200, easing = EaseInOutSine),
+            animation = tween(1400, easing = EaseInOutSine),
             repeatMode = RepeatMode.Reverse,
         ),
         label = "pulseScale",
@@ -74,330 +81,384 @@ fun FinalImposterChoiceScreen(
         ) {
             Spacer(Modifier.height(16.dp))
 
-            // ── Top Header ──
+            // ── Top Header Badge ──
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.Center,
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Icon(
-                    imageVector = Icons.Default.Warning,
+                    imageVector = Icons.Default.Help,
                     contentDescription = null,
-                    tint = DangerRed,
-                    modifier = Modifier.size(20.dp),
+                    tint = NeonGold,
+                    modifier = Modifier.size(22.dp),
                 )
-                Spacer(Modifier.width(6.dp))
+                Spacer(Modifier.width(8.dp))
                 Text(
-                    text = "FINAL IMPOSTER PHASE",
+                    text = "IMPOSTER CHOICE PHASE",
                     style = MaterialTheme.typography.titleSmall.copy(
                         fontWeight = FontWeight.Black,
                         letterSpacing = 2.sp,
                     ),
-                    color = DangerRed,
+                    color = NeonGold,
                 )
             }
 
             Spacer(Modifier.height(14.dp))
 
-            // ── Pass Phone Banner ──
+            // ── Status Banner (Anonymous) ──
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(18.dp))
                     .background(StitchSurfaceContainer)
                     .border(
-                        BorderStroke(1.5.dp, DangerRed.copy(alpha = 0.6f)),
+                        BorderStroke(1.dp, OutlineSubtle.copy(alpha = 0.35f)),
                         RoundedCornerShape(18.dp),
                     )
-                    .padding(vertical = 14.dp, horizontal = 16.dp),
+                    .padding(vertical = 12.dp, horizontal = 16.dp),
                 contentAlignment = Alignment.Center,
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    if (accusedPlayer != null) {
+                        Text(
+                            text = "${accusedPlayer.name} was eliminated!",
+                            style = MaterialTheme.typography.bodyMedium.copy(
+                                fontWeight = FontWeight.Bold,
+                            ),
+                            color = WarningYellow,
+                        )
+                        Spacer(Modifier.height(2.dp))
+                    }
                     Text(
-                        text = "👉 PASS PHONE TO",
+                        text = "${activePlayers.size} Players Remaining",
                         style = MaterialTheme.typography.labelSmall.copy(
                             fontWeight = FontWeight.Bold,
-                            letterSpacing = 1.5.sp,
+                            letterSpacing = 1.sp,
                         ),
                         color = OnSurfaceVariant,
-                    )
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        text = survivingImposter?.name ?: "Remaining Imposter",
-                        style = MaterialTheme.typography.headlineMedium.copy(
-                            fontWeight = FontWeight.Black,
-                            fontSize = 26.sp,
-                        ),
-                        color = DangerRed,
-                        textAlign = TextAlign.Center,
-                    )
-                    Spacer(Modifier.height(2.dp))
-                    Text(
-                        text = "Keep screen hidden from other players!",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = WarningYellow,
                     )
                 }
             }
 
-            Spacer(Modifier.height(18.dp))
+            Spacer(Modifier.height(20.dp))
 
-            if (!isRevealed) {
-                // ── Secret Hold / Tap to Reveal Screen ──
-                Box(
+            if (!isVolunteeringToGuess) {
+                // ── Main Public Question View ──
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .weight(1f)
-                        .scale(pulseScale)
-                        .clip(RoundedCornerShape(24.dp))
-                        .background(StitchSurfaceContainerHigh)
-                        .border(
-                            BorderStroke(1.dp, OutlineSubtle.copy(alpha = 0.35f)),
-                            RoundedCornerShape(24.dp),
-                        )
-                        .pointerInput(Unit) {
-                            detectTapGestures(
-                                onPress = {
-                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                    isRevealed = true
-                                }
+                        .weight(1f),
+                ) {
+                    // Question Card
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .scale(pulseScale)
+                            .clip(RoundedCornerShape(24.dp))
+                            .background(StitchSurfaceContainerHigh)
+                            .border(
+                                BorderStroke(1.5.dp, NeonPurple.copy(alpha = 0.6f)),
+                                RoundedCornerShape(24.dp),
+                            )
+                            .padding(24.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Box(
+                                modifier = Modifier
+                                    .size(60.dp)
+                                    .clip(CircleShape)
+                                    .background(NeonPurple.copy(alpha = 0.2f)),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Psychology,
+                                    contentDescription = null,
+                                    tint = PrimaryContainerNeon,
+                                    modifier = Modifier.size(36.dp),
+                                )
+                            }
+
+                            Spacer(Modifier.height(16.dp))
+
+                            Text(
+                                text = "Is the imposter want to guess the word?",
+                                style = MaterialTheme.typography.headlineSmall.copy(
+                                    fontWeight = FontWeight.Black,
+                                    fontSize = 22.sp,
+                                ),
+                                color = Color.White,
+                                textAlign = TextAlign.Center,
+                            )
+
+                            Spacer(Modifier.height(10.dp))
+
+                            Text(
+                                text = "• Yes: An imposter volunteers to guess for an instant +3 pts (eliminated if correct, Civilians win if wrong).\n• No: Proceed to the Sub-Round with a new secret word.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = OnSurfaceVariant,
+                                textAlign = TextAlign.Center,
                             )
                         }
-                        .padding(24.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(
-                            imageVector = Icons.Default.Lock,
-                            contentDescription = null,
-                            tint = NeonGold,
-                            modifier = Modifier.size(56.dp),
-                        )
-                        Spacer(Modifier.height(16.dp))
-                        Text(
-                            text = "Tap to Reveal Your Choices",
-                            style = MaterialTheme.typography.titleLarge.copy(
-                                fontWeight = FontWeight.Bold,
-                            ),
-                            color = Color.White,
-                            textAlign = TextAlign.Center,
-                        )
-                        Spacer(Modifier.height(6.dp))
-                        Text(
-                            text = "Only the surviving Imposter should view this screen",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = OnSurfaceVariant,
-                            textAlign = TextAlign.Center,
-                        )
                     }
+
+                    Spacer(Modifier.weight(1f))
+
+                    // ── Choice Buttons ──
+                    // YES Button (Gold/Amber)
+                    Button(
+                        onClick = { isVolunteeringToGuess = true },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(58.dp),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = NeonGold),
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center,
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Lightbulb,
+                                contentDescription = null,
+                                tint = DeepSpaceBg,
+                                modifier = Modifier.size(22.dp),
+                            )
+                            Spacer(Modifier.width(10.dp))
+                            Text(
+                                text = "Yes, Guess Secret Word (+3 pts)",
+                                style = MaterialTheme.typography.titleMedium.copy(
+                                    fontWeight = FontWeight.Black,
+                                    fontSize = 16.sp,
+                                ),
+                                color = DeepSpaceBg,
+                            )
+                        }
+                    }
+
+                    // NO Button (Purple/Indigo)
+                    Button(
+                        onClick = {
+                            gameViewModel.startSubRound()
+                            onNavigateToSubRoundReveal()
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(58.dp),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
+                        contentPadding = PaddingValues(0.dp),
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(
+                                    Brush.verticalGradient(listOf(NeonPurpleGlow, NeonPurple)),
+                                    shape = RoundedCornerShape(16.dp),
+                                )
+                                .border(
+                                    BorderStroke(1.dp, PrimaryContainerNeon.copy(alpha = 0.5f)),
+                                    shape = RoundedCornerShape(16.dp),
+                                ),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.Center,
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Groups,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(22.dp),
+                                )
+                                Spacer(Modifier.width(10.dp))
+                                Text(
+                                    text = "No, Go to Sub-Round",
+                                    style = MaterialTheme.typography.titleMedium.copy(
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 16.sp,
+                                    ),
+                                    color = Color.White,
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(Modifier.height(16.dp))
                 }
-                Spacer(Modifier.height(30.dp))
             } else {
-                // ── Revealed Imposter Choices ──
+                // ── Imposter Volunteer Input View ──
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f),
                     verticalArrangement = Arrangement.spacedBy(14.dp),
                 ) {
-                    Text(
-                        text = "One Imposter was caught! Choose your path:",
-                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
-                        color = Color.White,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-
-                    // ── Option A: Guess the Secret Word ──
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(18.dp))
-                            .background(
-                                if (selectedMode == ChoiceMode.GUESS_WORD) StitchSurfaceContainerHigh else StitchSurfaceContainer
-                            )
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(StitchSurfaceContainerHigh)
                             .border(
-                                BorderStroke(
-                                    if (selectedMode == ChoiceMode.GUESS_WORD) 2.dp else 1.dp,
-                                    if (selectedMode == ChoiceMode.GUESS_WORD) NeonGold else OutlineSubtle.copy(alpha = 0.3f),
-                                ),
-                                RoundedCornerShape(18.dp),
+                                BorderStroke(1.5.dp, NeonGold.copy(alpha = 0.8f)),
+                                RoundedCornerShape(20.dp),
                             )
-                            .padding(16.dp),
+                            .padding(20.dp),
                     ) {
                         Column {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.fillMaxWidth(),
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(36.dp)
-                                        .clip(CircleShape)
-                                        .background(NeonGold.copy(alpha = 0.15f)),
-                                    contentAlignment = Alignment.Center,
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Lightbulb,
-                                        contentDescription = null,
-                                        tint = NeonGold,
-                                        modifier = Modifier.size(20.dp),
-                                    )
-                                }
-                                Spacer(Modifier.width(10.dp))
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = "A. Guess the Word",
-                                        style = MaterialTheme.typography.titleMedium.copy(
-                                            fontWeight = FontWeight.Bold,
-                                        ),
-                                        color = NeonGold,
-                                    )
-                                    Text(
-                                        text = "Guess correctly to instantly win (+3 pts). Wrong guess = Civilians win.",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = OnSurfaceVariant,
-                                    )
-                                }
-                            }
-
-                            Spacer(Modifier.height(10.dp))
-
-                            if (selectedMode == ChoiceMode.GUESS_WORD) {
-                                OutlinedTextField(
-                                    value = wordGuessInput,
-                                    onValueChange = { wordGuessInput = it },
-                                    placeholder = { Text("Enter secret word guess...") },
-                                    singleLine = true,
-                                    modifier = Modifier.fillMaxWidth(),
-                                    shape = RoundedCornerShape(12.dp),
-                                    colors = OutlinedTextFieldDefaults.colors(
-                                        focusedBorderColor = NeonGold,
-                                        unfocusedBorderColor = OutlineSubtle,
-                                        focusedTextColor = Color.White,
-                                        unfocusedTextColor = Color.White,
-                                    ),
-                                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                                    keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.Visibility,
+                                    contentDescription = null,
+                                    tint = NeonGold,
+                                    modifier = Modifier.size(24.dp),
                                 )
+                                Spacer(Modifier.width(8.dp))
+                                Text(
+                                    text = "Imposter Word Guess",
+                                    style = MaterialTheme.typography.titleLarge.copy(
+                                        fontWeight = FontWeight.Black,
+                                    ),
+                                    color = NeonGold,
+                                )
+                            }
 
-                                Spacer(Modifier.height(10.dp))
+                            Spacer(Modifier.height(8.dp))
 
-                                Button(
-                                    onClick = {
-                                        if (wordGuessInput.isNotBlank()) {
-                                            gameViewModel.submitImposterWordGuess(wordGuessInput.trim())
-                                            onNavigateToResult()
-                                        }
-                                    },
-                                    enabled = wordGuessInput.isNotBlank(),
-                                    colors = ButtonDefaults.buttonColors(containerColor = NeonGold),
-                                    shape = RoundedCornerShape(12.dp),
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(46.dp),
-                                ) {
-                                    Text(
-                                        text = "Submit Word Guess",
-                                        color = DeepSpaceBg,
-                                        fontWeight = FontWeight.Bold,
-                                    )
-                                }
-                            } else {
-                                OutlinedButton(
-                                    onClick = { selectedMode = ChoiceMode.GUESS_WORD },
-                                    shape = RoundedCornerShape(12.dp),
-                                    border = BorderStroke(1.dp, NeonGold.copy(alpha = 0.5f)),
+                            Text(
+                                text = "The volunteering imposter is stepping forward! Enter the exact secret word below:",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = Color.White,
+                            )
+
+                            if (activeImposters.size > 1) {
+                                Spacer(Modifier.height(14.dp))
+                                Text(
+                                    text = "Select Volunteering Player:",
+                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                    color = OnSurfaceVariant,
+                                )
+                                Spacer(Modifier.height(6.dp))
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                                     modifier = Modifier.fillMaxWidth(),
                                 ) {
-                                    Text("Select Option A", color = NeonGold, fontWeight = FontWeight.Bold)
+                                    activeImposters.forEach { imposter ->
+                                        val isSelected = selectedVolunteerId == imposter.id
+                                        Box(
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .clip(RoundedCornerShape(10.dp))
+                                                .background(if (isSelected) NeonGold.copy(alpha = 0.2f) else StitchSurfaceContainer)
+                                                .border(
+                                                    BorderStroke(
+                                                        if (isSelected) 1.5.dp else 1.dp,
+                                                        if (isSelected) NeonGold else OutlineSubtle.copy(alpha = 0.3f),
+                                                    ),
+                                                    RoundedCornerShape(10.dp),
+                                                )
+                                                .clickable { selectedVolunteerId = imposter.id }
+                                                .padding(vertical = 8.dp, horizontal = 4.dp),
+                                            contentAlignment = Alignment.Center,
+                                        ) {
+                                            Text(
+                                                text = imposter.name,
+                                                style = MaterialTheme.typography.bodyMedium.copy(
+                                                    fontWeight = if (isSelected) FontWeight.Black else FontWeight.Medium,
+                                                ),
+                                                color = if (isSelected) NeonGold else Color.White,
+                                                maxLines = 1,
+                                            )
+                                        }
+                                    }
                                 }
                             }
-                        }
-                    }
 
-                    // ── Option B: Play Final Sub-Round ──
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(18.dp))
-                            .background(
-                                if (selectedMode == ChoiceMode.SUB_ROUND) StitchSurfaceContainerHigh else StitchSurfaceContainer
-                            )
-                            .border(
-                                BorderStroke(
-                                    if (selectedMode == ChoiceMode.SUB_ROUND) 2.dp else 1.dp,
-                                    if (selectedMode == ChoiceMode.SUB_ROUND) NeonPurple else OutlineSubtle.copy(alpha = 0.3f),
-                                ),
-                                RoundedCornerShape(18.dp),
-                            )
-                            .padding(16.dp),
-                    ) {
-                        Column {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
+                            Spacer(Modifier.height(16.dp))
+
+                            OutlinedTextField(
+                                value = wordGuessInput,
+                                onValueChange = { wordGuessInput = it },
+                                placeholder = { Text("Type the secret word...") },
+                                singleLine = true,
                                 modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = NeonGold,
+                                    unfocusedBorderColor = OutlineSubtle,
+                                    focusedTextColor = Color.White,
+                                    unfocusedTextColor = Color.White,
+                                ),
+                                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                                keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
+                            )
+
+                            Spacer(Modifier.height(14.dp))
+
+                            // Stakes Reminder
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(StitchSurfaceContainer)
+                                    .padding(10.dp),
                             ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(36.dp)
-                                        .clip(CircleShape)
-                                        .background(NeonPurple.copy(alpha = 0.15f)),
-                                    contentAlignment = Alignment.Center,
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Groups,
-                                        contentDescription = null,
-                                        tint = PrimaryContainerNeon,
-                                        modifier = Modifier.size(20.dp),
-                                    )
-                                }
-                                Spacer(Modifier.width(10.dp))
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = "B. Play Sub-Round",
-                                        style = MaterialTheme.typography.titleMedium.copy(
-                                            fontWeight = FontWeight.Bold,
-                                        ),
-                                        color = PrimaryContainerNeon,
-                                    )
-                                    Text(
-                                        text = "Continue with a final clue & vote with surviving players. Survive to win (+3 pts).",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = OnSurfaceVariant,
-                                    )
-                                }
+                                Text(
+                                    text = "⚠️ Correct = +3 pts instant & eliminated • Wrong = Civilians Win",
+                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                    color = WarningYellow,
+                                    textAlign = TextAlign.Center,
+                                    modifier = Modifier.fillMaxWidth(),
+                                )
                             }
 
-                            Spacer(Modifier.height(10.dp))
+                            Spacer(Modifier.height(16.dp))
 
                             Button(
                                 onClick = {
-                                    gameViewModel.startSubRound()
-                                    onNavigateToSubRoundDiscussion()
+                                    if (wordGuessInput.isNotBlank()) {
+                                        gameViewModel.submitImposterWordGuess(
+                                            guess = wordGuessInput.trim(),
+                                            volunteerPlayerId = selectedVolunteerId,
+                                        )
+                                        onNavigateToResult()
+                                    }
                                 },
-                                colors = ButtonDefaults.buttonColors(containerColor = NeonPurple),
+                                enabled = wordGuessInput.isNotBlank(),
+                                colors = ButtonDefaults.buttonColors(containerColor = NeonGold),
                                 shape = RoundedCornerShape(12.dp),
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .height(46.dp),
+                                    .height(50.dp),
                             ) {
                                 Text(
-                                    text = "Start Final Sub-Round",
-                                    color = Color.White,
-                                    fontWeight = FontWeight.Bold,
+                                    text = "Confirm & Submit Guess",
+                                    color = DeepSpaceBg,
+                                    fontWeight = FontWeight.Black,
+                                    fontSize = 15.sp,
+                                )
+                            }
+
+                            Spacer(Modifier.height(8.dp))
+
+                            TextButton(
+                                onClick = { isVolunteeringToGuess = false },
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                Text(
+                                    text = "Cancel & Go Back",
+                                    color = OnSurfaceVariant,
+                                    fontWeight = FontWeight.SemiBold,
                                 )
                             }
                         }
                     }
                 }
-                Spacer(Modifier.height(20.dp))
             }
         }
     }
-}
-
-private enum class ChoiceMode {
-    GUESS_WORD,
-    SUB_ROUND,
 }

@@ -49,12 +49,8 @@ fun VotingScreen(
     var selectedPlayerId by remember(gameState.currentVoterIndex) { mutableStateOf<Int?>(null) }
     val haptic = LocalHapticFeedback.current
 
-    val activePlayers = remember(gameState.players, gameState.eliminatedPlayerIds, gameState.isSubRound) {
-        if (gameState.isSubRound) {
-            gameState.players.filter { it.id !in gameState.eliminatedPlayerIds }
-        } else {
-            gameState.players
-        }
+    val activePlayers = remember(gameState.players, gameState.eliminatedPlayerIds) {
+        gameState.players.filter { it.id !in gameState.eliminatedPlayerIds }
     }
 
     // Watch for phase transitions
@@ -103,7 +99,7 @@ fun VotingScreen(
                     )
                     Spacer(Modifier.width(6.dp))
                     Text(
-                        text = if (gameState.isSubRound) "SUB-ROUND VOTING" else "SECRET VOTING",
+                        text = if (gameState.isSubRound) "SUB-ROUND ${gameState.subRoundNumber} VOTING" else "SECRET VOTING",
                         style = MaterialTheme.typography.titleMedium.copy(
                             fontWeight = FontWeight.Black,
                             letterSpacing = 1.5.sp,

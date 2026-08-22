@@ -75,7 +75,11 @@ fun MainNavigation() {
                 CardRevealScreen(
                     gameViewModel = gameViewModel,
                     onAllRevealed = {
-                        backStack.add(DiscussionRoute)
+                        if (gameViewModel.gameState.value.isSubRound) {
+                            backStack.add(SubRoundDiscussionRoute)
+                        } else {
+                            backStack.add(DiscussionRoute)
+                        }
                     },
                     modifier = baseMod,
                 )
@@ -112,8 +116,8 @@ fun MainNavigation() {
                     onNavigateToResult = {
                         backStack.add(ResultRoute)
                     },
-                    onNavigateToSubRoundDiscussion = {
-                        backStack.add(SubRoundDiscussionRoute)
+                    onNavigateToSubRoundReveal = {
+                        backStack.add(CardRevealRoute)
                     },
                     modifier = baseMod,
                 )
@@ -134,7 +138,11 @@ fun MainNavigation() {
                 VotingScreen(
                     gameViewModel = gameViewModel,
                     onVotingComplete = {
-                        backStack.add(ResultRoute)
+                        if (gameViewModel.gameState.value.phase == GamePhase.FINAL_IMPOSTER_CHOICE) {
+                            backStack.add(FinalImposterChoiceRoute)
+                        } else {
+                            backStack.add(ResultRoute)
+                        }
                     },
                     modifier = baseMod,
                 )

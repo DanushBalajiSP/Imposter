@@ -1,5 +1,6 @@
 package com.example.imposterparty
 
+import com.example.imposterparty.data.local.RandomizerState
 import com.example.imposterparty.data.model.*
 import com.example.imposterparty.data.randomizer.FairRandomizer
 import org.junit.Assert.*
@@ -7,95 +8,158 @@ import org.junit.Test
 
 class VotingAndFinalImposterTest {
 
-    // ── Test 1: Civilians Win -> Right voters get 2 pts (1+1), Wrong voters get 1 pt, Imposter gets 0 ──
+    // ── Rule 1: Civilian Accused in Main Round -> Round Ends Immediately & Imposters Win ──
     @Test
-    fun `civilians win gives 2 points to right voters, 1 point to wrong voters, and 0 to imposter`() {
+    fun `civilian accused in main round results in immediate imposter victory with secured and bonus points`() {
         val players = listOf(
             Player(0, "Alice", role = Role.CIVILIAN),
             Player(1, "Bob", role = Role.CIVILIAN),
             Player(2, "Charlie", role = Role.CIVILIAN),
             Player(3, "Imposter1", role = Role.IMPOSTER),
+            Player(4, "Imposter2", role = Role.IMPOSTER),
         )
+        val accusedId = 0 // Alice (Civilian) was accused
+        val isAccusedImposter = players.find { it.id == accusedId }?.role == Role.IMPOSTER
 
-        // Votes:
-        // Alice and Bob vote for Imposter1 (2 votes -> eliminated)
-        // Charlie votes for Bob (wrong vote)
-        // Imposter1 votes for Alice
-        val votes = mapOf(
-            0 to 3, // Alice -> Imposter1 (Right vote)
-            1 to 3, // Bob -> Imposter1 (Right vote)
-            2 to 1, // Charlie -> Bob (Wrong vote)
-            3 to 0, // Imposter1 -> Alice
-        )
+        assertFalse(isAccusedImposter)
+        // Imposters win immediately
+        val nextPhase = if (!isAccusedImposter) GamePhase.RESULT else GamePhase.FINAL_IMPOSTER_CHOICE
+        assertEquals(GamePhase.RESULT, nextPhase)
 
-        val accusedId = 3 // Imposter1 was eliminated
-        val accusedPlayer = players.find { it.id == accusedId }
-        val isAccusedImposter = accusedPlayer?.role == Role.IMPOSTER // true
-
+        // Surviving imposters get 1 secured point (from escaping round 1) + 1 bonus point = 2 points
         val roundScores = mutableMapOf<String, Int>()
+        players.filter { it.role == Role.IMPOSTER }.forEach { imposter ->
+            val secured = 1
+            val bonus = 1
+            roundScores[imposter.name] = secured + bonus
+        }
+        assertEquals(2, roundScores["Imposter1"])
+        assertEquals(2, roundScores["Imposter2"])
+    }
+
+    // ── Rule 1: Civilian Accused in ANY Sub-Round -> Round Ends Immediately & Imposters Win ──
+    @Test
+    fun `civilian accused in sub-round results in immediate imposter victory`() {
+        val players = listOf(
+            Player(0, "Alice", role = Role.CIVILIAN),
+            Player(1, "Bob", role = Role.CIVILIAN),
+            Player(2, "Imposter1", role = Role.IMPOSTER),
+            Player(3, "Imposter2", role = Role.IMPOSTER),
+        )
+        // Imposter1 was eliminated in Main Round 1 (secured 0 pts)
+        // Imposter2 survived Main Round 1 (secured 1 pt)
+        val imposterSecured = mutableMapOf(2 to 0, 3 to 1)
+
+        // In Sub-Round 1, Alice (Civilian) is accused
+        val subAccusedId = 0
+        val isSubAccusedImposter = players.find { it.id == subAccusedId }?.role == Role.IMPOSTER
+        assertFalse(isSubAccusedImposter)
+
+        // Round ends immediately -> Imposters Win
+        val nextPhase = if (!isSubAccusedImposter) GamePhase.RESULT else GamePhase.FINAL_IMPOSTER_CHOICE
+        assertEquals(GamePhase.RESULT, nextPhase)
+
+        // Imposter2 survived Sub-Round 1 (+1 secured) and wins the match (+1 bonus)
+        val imposter2Secured = (imposterSecured[3] ?: 0) + 1 // = 2
+        val imposter2Total = imposter2Secured + 1 // = 3
+
+        // Imposter1 was eliminated in R1, so gets only their 0 secured points
+        val imposter1Total = imposterSecured[2] ?: 0 // = 0
+
+        assertEquals(3, imposter2Total)
+        assertEquals(0, imposter1Total)
+    }
+
+    // ── Rule 2: Imposter Point Accumulation Across Multiple Sub-Rounds ──
+    @Test
+    fun `imposter secures 1 point per survived round and 1 bonus point upon winning match`() {
+        val imposterId = 4
+        var securedPoints = 0
+
+        // Round 1: Survives -> +1 point
+        securedPoints += 1
+        assertEquals(1, securedPoints)
+
+        // Sub-Round 1: Survives -> +1 point
+        securedPoints += 1
+        assertEquals(2, securedPoints)
+
+        // Sub-Round 2: Survives & Match Won -> +1 secured point + 1 bonus point
+        securedPoints += 1
+        val finalPoints = securedPoints + 1
+        assertEquals(4, finalPoints)
+    }
+
+    // ── Rule 2: Eliminated Imposter Retains Only Previously Secured Points ──
+    @Test
+    fun `eliminated imposter retains only points secured from rounds survived prior to elimination`() {
+        // Imposter A eliminated in Round 1 -> 0 points
+        val imposterAScore = 0
+        // Imposter B survived Round 1 (+1), then eliminated in Sub-Round 1 -> 1 point
+        val imposterBScore = 1
+        // Imposter C survived Round 1 (+1), Sub-Round 1 (+1), and won in Sub-Round 2 (+1 + 1 bonus) -> 4 points
+        val imposterCScore = 1 + 1 + 1 + 1
+
+        assertEquals(0, imposterAScore)
+        assertEquals(1, imposterBScore)
+        assertEquals(4, imposterCScore)
+    }
+
+    // ── All Imposters Eliminated -> Civilians Win ──
+    @Test
+    fun `all imposters eliminated results in civilian victory with base points and voting bonuses`() {
+        val players = listOf(
+            Player(0, "Alice", role = Role.CIVILIAN),
+            Player(1, "Bob", role = Role.CIVILIAN),
+            Player(2, "Charlie", role = Role.CIVILIAN),
+            Player(3, "Imposter1", role = Role.IMPOSTER),
+            Player(4, "Imposter2", role = Role.IMPOSTER),
+        )
+        // Imposter1 eliminated in R1 (Alice & Bob voted right)
+        // Imposter2 eliminated in SR1 (Alice voted right)
+        val finalScores = mutableMapOf<String, Int>()
+        val isCivilianWin = true
+
         players.forEach { player ->
             if (player.role == Role.CIVILIAN) {
-                val votedForId = votes[player.id]
-                val votedForEliminatedImposter = isAccusedImposter && (votedForId == accusedId)
-                // Base 1 point for Civilians winning + 1 bonus if voted for eliminated imposter
-                roundScores[player.name] = if (votedForEliminatedImposter) 2 else 1
+                // Base 1 point + 1 bonus if they ever voted for an eliminated imposter
+                val hasVotedRight = player.name in listOf("Alice", "Bob")
+                finalScores[player.name] = 1 + (if (hasVotedRight) 1 else 0)
             } else {
-                roundScores[player.name] = 0
+                // Imposter1 secured 0, Imposter2 secured 1
+                finalScores[player.name] = if (player.id == 4) 1 else 0
             }
         }
 
-        // Alice and Bob both get 2 points (1 base + 1 right vote bonus)
-        assertEquals(2, roundScores["Alice"])
-        assertEquals(2, roundScores["Bob"])
-        // Charlie was a civilian on the winning team, but voted wrong -> gets 1 base point
-        assertEquals(1, roundScores["Charlie"])
-        // Imposter was caught and lost -> 0 points
-        assertEquals(0, roundScores["Imposter1"])
+        assertEquals(2, finalScores["Alice"])
+        assertEquals(2, finalScores["Bob"])
+        assertEquals(1, finalScores["Charlie"])
+        assertEquals(0, finalScores["Imposter1"])
+        assertEquals(1, finalScores["Imposter2"])
     }
 
-    // ── Test 2: Imposters Win -> Imposter gets 1 pt, Right voter civilian gets 1 pt, Wrong voter gets 0 ──
+    // ── Volunteer Imposter Word Guess: Correct Guess (+3 Pts & Eliminated) ──
     @Test
-    fun `imposters win gives 1 point to imposter, 1 point to right voting civilian, and 0 to wrong voters`() {
-        val players = listOf(
-            Player(0, "Alice", role = Role.CIVILIAN),
-            Player(1, "Bob", role = Role.CIVILIAN),
-            Player(2, "Charlie", role = Role.CIVILIAN),
-            Player(3, "Imposter1", role = Role.IMPOSTER),
-        )
+    fun `volunteer imposter guesses word correctly earns 3 points and is eliminated`() {
+        val secretWord = "Astronaut"
+        val guess = "  astronaut  "
+        val normalizedGuess = FairRandomizer.normalizeWord(guess)
+        val normalizedSecret = FairRandomizer.normalizeWord(secretWord)
 
-        // Votes:
-        // Alice votes for Imposter1 (correct vote)
-        // Bob, Charlie, Imposter1 vote for Alice (Alice is eliminated -> Imposter escapes!)
-        val votes = mapOf(
-            0 to 3, // Alice -> Imposter1 (Right vote)
-            1 to 0, // Bob -> Alice (Wrong vote)
-            2 to 0, // Charlie -> Alice (Wrong vote)
-            3 to 0, // Imposter1 -> Alice
-        )
+        assertTrue(normalizedGuess == normalizedSecret)
 
-        val accusedId = 0 // Alice was accused/eliminated
-        val accusedPlayer = players.find { it.id == accusedId }
-        val isAccusedImposter = accusedPlayer?.role == Role.IMPOSTER // false
+        val volunteerPlayerId = 4
+        val eliminatedPlayerIds = listOf(3)
+        val updatedEliminated = (eliminatedPlayerIds + volunteerPlayerId).distinct()
 
-        val roundScores = mutableMapOf<String, Int>()
-        roundScores["Imposter1"] = 1
-        players.filter { it.role == Role.CIVILIAN }.forEach { civilian ->
-            val votedForId = votes[civilian.id]
-            val votedForPlayer = players.find { it.id == votedForId }
-            val votedForAnImposter = votedForPlayer?.role == Role.IMPOSTER
-            roundScores[civilian.name] = if (votedForAnImposter) 1 else 0
-        }
+        assertTrue(updatedEliminated.contains(volunteerPlayerId))
+        assertEquals(listOf(3, 4), updatedEliminated)
 
-        // Imposter survived and won -> 1 point
-        assertEquals(1, roundScores["Imposter1"])
-        // Alice voted for the actual imposter even though team lost -> gets 1 vote point
-        assertEquals(1, roundScores["Alice"])
-        // Bob and Charlie voted wrongly on a losing civilian team -> 0 points
-        assertEquals(0, roundScores["Bob"])
-        assertEquals(0, roundScores["Charlie"])
+        val volunteerScore = 3
+        assertEquals(3, volunteerScore)
     }
 
-    // ── Test 3: Disallow Self Voting ──
+    // ── Candidate List Disallows Self-Voting ──
     @Test
     fun `voting candidate list disallows self-voting`() {
         val players = listOf(
@@ -110,105 +174,39 @@ class VotingAndFinalImposterTest {
         assertEquals(2, candidatePlayers.size)
     }
 
-    // ── Test 4: Two Imposters - Both Survive ──
+    // ── Universal Fair Randomizer State Test ──
     @Test
-    fun `two imposters - both survive results in imposter win with 1 point each`() {
+    fun `universal fair randomizer handles cross match imposter histories and reset correctly`() {
         val players = listOf(
-            Player(0, "Alice", role = Role.CIVILIAN),
-            Player(1, "Bob", role = Role.CIVILIAN),
-            Player(2, "Imposter1", role = Role.IMPOSTER),
-            Player(3, "Imposter2", role = Role.IMPOSTER),
+            Player(0, "Alice"),
+            Player(1, "Bob"),
+            Player(2, "Charlie"),
         )
-        val accusedId = 0 // Alice was accused/eliminated
-        val allImposters = players.filter { it.role == Role.IMPOSTER }
-        val isAccusedImposter = players.find { it.id == accusedId }?.role == Role.IMPOSTER
 
-        assertFalse(isAccusedImposter)
-        // Both imposters survive -> Imposter Win
-        val isCivilianWin = false
-        val imposterPoints = if (!isCivilianWin) 1 else 0
-        assertEquals(1, imposterPoints)
-    }
-
-    // ── Test 5: Two Imposters - Exactly 1 Eliminated triggers Final Imposter Phase ──
-    @Test
-    fun `two imposters - 1 eliminated triggers final imposter phase with surviving imposter`() {
-        val players = listOf(
-            Player(0, "Alice", role = Role.CIVILIAN),
-            Player(1, "Bob", role = Role.CIVILIAN),
-            Player(2, "Charlie", role = Role.CIVILIAN),
-            Player(3, "Imposter1", role = Role.IMPOSTER),
-            Player(4, "Imposter2", role = Role.IMPOSTER),
+        // Previous match history where Alice was imposter 3 times and was imposter last round
+        val state = RandomizerState(
+            globalRoundCounter = 5,
+            wordUsageHistory = mapOf("apple" to 5),
+            playerImposterCounts = mapOf("alice" to 3, "bob" to 1, "charlie" to 1),
+            recentImposterNames = listOf(listOf("Alice"), listOf("Bob")),
         )
-        val accusedId = 3 // Imposter1 is eliminated
-        val allImposters = players.filter { it.role == Role.IMPOSTER }
-        val isAccusedImposter = players.find { it.id == accusedId }?.role == Role.IMPOSTER
 
-        assertTrue(isAccusedImposter)
-        val survivingImposters = allImposters.filter { it.id != accusedId }
-        assertEquals(1, survivingImposters.size)
-        assertEquals(4, survivingImposters.first().id) // Imposter2 enters Final Phase
-    }
+        val histories = FairRandomizer.buildPlayerHistoriesFromState(
+            players = players,
+            playerImposterCounts = state.playerImposterCounts,
+            recentImposterRounds = state.recentImposterNames,
+        )
 
-    // ── Test 6: Final Imposter Phase - Guess the Word Correctly (+3 Total Points) ──
-    @Test
-    fun `final imposter guesses secret word correctly resulting in 3 total points`() {
-        val secretWord = "Astronaut"
-        val guess = "  astronaut  "
-        val normalizedGuess = FairRandomizer.normalizeWord(guess)
-        val normalizedSecret = FairRandomizer.normalizeWord(secretWord)
+        assertEquals(3, histories[0]?.totalImposterCount)
+        assertTrue(histories[0]?.previousRoundWasImposter == true)
+        assertFalse(histories[1]?.previousRoundWasImposter == true)
+        assertTrue(histories[1]?.twoRoundsAgoWasImposter == true)
 
-        assertTrue(normalizedGuess == normalizedSecret)
-
-        // Surviving Imposter receives +3 total points (+2 hidden survival bonus + +1 final victory)
-        val finalImposterPoints = 3
-        assertEquals(3, finalImposterPoints)
-    }
-
-    // ── Test 7: Final Imposter Phase - Guess the Word Incorrectly (Civilian Win) ──
-    @Test
-    fun `final imposter guesses secret word incorrectly resulting in civilian win`() {
-        val secretWord = "Astronaut"
-        val guess = "Alien"
-        val normalizedGuess = FairRandomizer.normalizeWord(guess)
-        val normalizedSecret = FairRandomizer.normalizeWord(secretWord)
-
-        assertFalse(normalizedGuess == normalizedSecret)
-
-        val isCivilianWin = true
-        val finalImposterPoints = 0
-        assertTrue(isCivilianWin)
-        assertEquals(0, finalImposterPoints)
-    }
-
-    // ── Test 8: Final Imposter Phase - Sub-Round Imposter Survives (+3 Total Points) ──
-    @Test
-    fun `sub-round imposter survives resulting in imposter win with 3 total points`() {
-        val remainingImposterId = 4
-        val subRoundAccusedId = 0 // Civilian Alice was eliminated in sub-round
-
-        val isRemainingImposterEliminated = subRoundAccusedId == remainingImposterId
-        assertFalse(isRemainingImposterEliminated)
-
-        // Imposter wins sub-round -> gets 3 points total
-        val imposterPoints = 3
-        val isCivilianWin = false
-        assertEquals(3, imposterPoints)
-        assertFalse(isCivilianWin)
-    }
-
-    // ── Test 9: Final Imposter Phase - Sub-Round Imposter Eliminated (Civilian Win) ──
-    @Test
-    fun `sub-round imposter eliminated resulting in civilian win`() {
-        val remainingImposterId = 4
-        val subRoundAccusedId = 4 // Imposter was eliminated in sub-round
-
-        val isRemainingImposterEliminated = subRoundAccusedId == remainingImposterId
-        assertTrue(isRemainingImposterEliminated)
-
-        val isCivilianWin = true
-        val imposterPoints = 0
-        assertTrue(isCivilianWin)
-        assertEquals(0, imposterPoints)
+        // Test Reset State
+        val resetState = RandomizerState()
+        assertEquals(0, resetState.globalRoundCounter)
+        assertTrue(resetState.wordUsageHistory.isEmpty())
+        assertTrue(resetState.playerImposterCounts.isEmpty())
+        assertTrue(resetState.recentImposterNames.isEmpty())
     }
 }

@@ -322,4 +322,43 @@ object FairRandomizer {
             )
         }
     }
+
+    /**
+     * Builds player imposter histories from global persistent RandomizerState across all matches.
+     */
+    fun buildPlayerHistoriesFromState(
+        players: List<Player>,
+        playerImposterCounts: Map<String, Int>,
+        recentImposterRounds: List<List<String>>, // most recent round first
+    ): Map<Int, PlayerImposterHistory> {
+        return players.associate { player ->
+            val pName = player.name.trim().lowercase()
+            val totalCount = playerImposterCounts[pName] ?: 0
+
+            val prevRoundNames = recentImposterRounds.getOrNull(0)?.map { it.trim().lowercase() } ?: emptyList()
+            val twoRoundsAgoNames = recentImposterRounds.getOrNull(1)?.map { it.trim().lowercase() } ?: emptyList()
+
+            val previousRoundWasImposter = pName in prevRoundNames
+            val twoRoundsAgoWasImposter = pName in twoRoundsAgoNames
+
+            // Find index of most recent round where this player was imposter
+            var roundsSince = Int.MAX_VALUE
+            for (idx in recentImposterRounds.indices) {
+                if (recentImposterRounds[idx].any { it.trim().equals(pName, ignoreCase = true) }) {
+                    roundsSince = idx
+                    break
+                }
+            }
+
+            player.id to PlayerImposterHistory(
+                playerId = player.id,
+                playerName = player.name,
+                totalImposterCount = totalCount,
+                lastImposterRound = if (roundsSince == Int.MAX_VALUE) -1 else roundsSince,
+                previousRoundWasImposter = previousRoundWasImposter,
+                twoRoundsAgoWasImposter = twoRoundsAgoWasImposter,
+                roundsSinceImposter = roundsSince,
+            )
+        }
+    }
 }
