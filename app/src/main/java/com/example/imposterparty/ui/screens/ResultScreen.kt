@@ -119,11 +119,13 @@ fun ResultScreen(
                     )
                 }
             },
+        contentAlignment = Alignment.TopCenter,
     ) {
         LazyColumn(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier
                 .fillMaxSize()
+                .widthIn(max = 520.dp)
                 .padding(horizontal = 20.dp),
             contentPadding = PaddingValues(top = 16.dp, bottom = 110.dp),
         ) {

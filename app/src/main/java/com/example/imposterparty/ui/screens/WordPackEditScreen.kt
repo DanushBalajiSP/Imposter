@@ -56,11 +56,16 @@ fun WordPackEditScreen(
     val canSave = entries.any { it.first.isNotBlank() }
 
     Box(
-        modifier = modifier.background(
-            Brush.verticalGradient(listOf(DarkBackground, DarkSurface))
-        ),
+        modifier = modifier
+            .background(DeepSpaceBg)
+            .fillMaxSize(),
+        contentAlignment = Alignment.TopCenter,
     ) {
-        Column(modifier = Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .widthIn(max = 560.dp)
+        ) {
             // Top bar
             Row(
                 verticalAlignment = Alignment.CenterVertically,

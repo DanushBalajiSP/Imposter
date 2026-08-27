@@ -168,10 +168,12 @@ fun ScoreboardScreen(
         modifier = modifier
             .background(DeepSpaceBg)
             .fillMaxSize(),
+        contentAlignment = Alignment.TopCenter,
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .widthIn(max = 560.dp)
                 .padding(horizontal = 20.dp),
         ) {
             // ── Top App Bar ──

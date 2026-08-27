@@ -7,8 +7,10 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.*
@@ -47,6 +49,7 @@ fun CardRevealScreen(
     var isRevealing by remember { mutableStateOf(false) }
     var hasCurrentPlayerOpenedCard by remember(gameState.currentRevealIndex) { mutableStateOf(false) }
     val haptic = LocalHapticFeedback.current
+    val scrollState = rememberScrollState()
 
     // Watch for phase transition to Discussion or Sub-Round Discussion
     LaunchedEffect(gameState.phase) {
@@ -88,12 +91,16 @@ fun CardRevealScreen(
         modifier = modifier
             .background(DeepSpaceBg)
             .fillMaxSize(),
+        contentAlignment = Alignment.TopCenter,
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 20.dp),
+                .widthIn(max = 480.dp)
+                .verticalScroll(scrollState)
+                .padding(horizontal = 20.dp)
+                .padding(top = 16.dp, bottom = 96.dp),
         ) {
             val totalRevealCount = if (gameState.revealOrder.isNotEmpty()) gameState.revealOrder.size else gameState.players.size
             val currentRevealNum = (gameState.currentRevealIndex + 1).coerceAtMost(totalRevealCount)
@@ -124,7 +131,7 @@ fun CardRevealScreen(
                 trackColor = StitchSurfaceContainerHigh,
             )
 
-            Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(18.dp))
 
             if (currentPlayer != null) {
                 // ── Player Turn Info ──
@@ -141,13 +148,13 @@ fun CardRevealScreen(
                     style = MaterialTheme.typography.headlineLarge.copy(
                         fontWeight = FontWeight.Black,
                         letterSpacing = 0.5.sp,
-                        fontSize = 32.sp,
+                        fontSize = 30.sp,
                     ),
                     color = NeonCyanSoft,
                     textAlign = TextAlign.Center,
                 )
 
-                Spacer(Modifier.height(24.dp))
+                Spacer(Modifier.height(18.dp))
 
                 // ── Interactive Card Container ──
                 val cardShape = RoundedCornerShape(24.dp)
@@ -157,7 +164,7 @@ fun CardRevealScreen(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(360.dp)
+                        .heightIn(min = 280.dp, max = 340.dp)
                         .scale(if (!isRevealing) pulseScale else 1f)
                         .graphicsLayer {
                             rotationY = rotation

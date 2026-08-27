@@ -118,7 +118,6 @@ class VotingAndFinalImposterTest {
         // Imposter1 eliminated in R1 (Alice & Bob voted right)
         // Imposter2 eliminated in SR1 (Alice voted right)
         val finalScores = mutableMapOf<String, Int>()
-        val isCivilianWin = true
 
         players.forEach { player ->
             if (player.role == Role.CIVILIAN) {
@@ -138,25 +137,135 @@ class VotingAndFinalImposterTest {
         assertEquals(1, finalScores["Imposter2"])
     }
 
-    // ── Volunteer Imposter Word Guess: Correct Guess (+3 Pts & Eliminated) ──
+    // ── Multi-Imposter Guessing: One Guesses Correctly (+2 Pts), Other Goes to Sub-Round ──
     @Test
-    fun `volunteer imposter guesses word correctly earns 3 points and is eliminated`() {
-        val secretWord = "Astronaut"
-        val guess = "  astronaut  "
-        val normalizedGuess = FairRandomizer.normalizeWord(guess)
-        val normalizedSecret = FairRandomizer.normalizeWord(secretWord)
+    fun `multi imposter scenario one guesses correctly with 2 points and other proceeds to sub round`() {
+        val players = listOf(
+            Player(0, "Alice", role = Role.CIVILIAN),
+            Player(1, "Bob", role = Role.CIVILIAN),
+            Player(2, "Imposter1", role = Role.IMPOSTER),
+            Player(3, "Imposter2", role = Role.IMPOSTER),
+            Player(4, "Imposter3", role = Role.IMPOSTER),
+        )
+        // Imposter1 eliminated in Round 1
+        val eliminated = mutableListOf(2)
+        val securedPoints = mutableMapOf(2 to 0, 3 to 1, 4 to 1)
 
-        assertTrue(normalizedGuess == normalizedSecret)
+        // Imposter2 volunteers to guess the word
+        val secretWord = "Galaxy"
+        val guess = "galaxy"
+        val isCorrect = FairRandomizer.normalizeWord(guess) == FairRandomizer.normalizeWord(secretWord)
+        assertTrue(isCorrect)
 
-        val volunteerPlayerId = 4
-        val eliminatedPlayerIds = listOf(3)
-        val updatedEliminated = (eliminatedPlayerIds + volunteerPlayerId).distinct()
+        // Imposter2 earns +2 points and is eliminated
+        securedPoints[3] = (securedPoints[3] ?: 0) + 2 // 1 + 2 = 3
+        eliminated.add(3)
 
-        assertTrue(updatedEliminated.contains(volunteerPlayerId))
-        assertEquals(listOf(3, 4), updatedEliminated)
+        val remainingImposters = players.filter { it.role == Role.IMPOSTER && it.id !in eliminated }
+        assertEquals(1, remainingImposters.size)
+        assertEquals(4, remainingImposters.first().id) // Imposter3 remains
 
-        val volunteerScore = 3
-        assertEquals(3, volunteerScore)
+        // Phase remains FINAL_IMPOSTER_CHOICE because Imposter3 is still active!
+        val nextPhase = if (remainingImposters.isEmpty()) GamePhase.RESULT else GamePhase.FINAL_IMPOSTER_CHOICE
+        assertEquals(GamePhase.FINAL_IMPOSTER_CHOICE, nextPhase)
+
+        // Imposter3 chooses Sub-Round, and in Sub-Round a Civilian is accused (Imposters win!)
+        // Imposter3 survived sub-round (+1 secured) and won the match (+1 bonus) = 1 + 1 + 1 = 3 pts
+        val imposter3Total = (securedPoints[4] ?: 0) + 1 + 1 // = 3
+        // Imposter2 keeps their 3 secured points
+        val imposter2Total = securedPoints[3] ?: 0 // = 3
+        // Imposter1 gets 0
+        val imposter1Total = securedPoints[2] ?: 0 // = 0
+
+        assertEquals(3, imposter2Total)
+        assertEquals(3, imposter3Total)
+        assertEquals(0, imposter1Total)
+    }
+
+    // ── Multi-Imposter Guessing: One Guesses WRONGLY, Match Continues For Remaining Imposters ──
+    @Test
+    fun `multi imposter scenario one guesses wrongly is eliminated and match continues for remaining imposter`() {
+        val players = listOf(
+            Player(0, "Alice", role = Role.CIVILIAN),
+            Player(1, "Bob", role = Role.CIVILIAN),
+            Player(2, "Imposter1", role = Role.IMPOSTER),
+            Player(3, "Imposter2", role = Role.IMPOSTER),
+            Player(4, "Imposter3", role = Role.IMPOSTER),
+        )
+        // Imposter1 eliminated in Round 1
+        val eliminated = mutableListOf(2)
+        val securedPoints = mutableMapOf(2 to 0, 3 to 1, 4 to 1)
+
+        // Imposter2 volunteers to guess the word and guesses WRONGLY
+        val secretWord = "Galaxy"
+        val wrongGuess = "planet"
+        val isCorrect = FairRandomizer.normalizeWord(wrongGuess) == FairRandomizer.normalizeWord(secretWord)
+        assertFalse(isCorrect)
+
+        // Imposter2 gets 0 bonus (retains their 1 secured point) and is eliminated
+        eliminated.add(3)
+
+        var remainingImposters = players.filter { it.role == Role.IMPOSTER && it.id !in eliminated }
+        assertEquals(1, remainingImposters.size)
+        assertEquals(4, remainingImposters.first().id) // Imposter3 remains active!
+
+        // Match does NOT immediately end; stays in FINAL_IMPOSTER_CHOICE for Imposter3
+        val nextPhase = if (remainingImposters.isEmpty()) GamePhase.RESULT else GamePhase.FINAL_IMPOSTER_CHOICE
+        assertEquals(GamePhase.FINAL_IMPOSTER_CHOICE, nextPhase)
+
+        // Now Imposter3 also guesses correctly (+2 pts) and safely exits
+        val rightGuess = "galaxy"
+        assertTrue(FairRandomizer.normalizeWord(rightGuess) == FairRandomizer.normalizeWord(secretWord))
+        securedPoints[4] = (securedPoints[4] ?: 0) + 2 // 1 + 2 = 3
+        eliminated.add(4)
+
+        remainingImposters = players.filter { it.role == Role.IMPOSTER && it.id !in eliminated }
+        assertTrue(remainingImposters.isEmpty())
+
+        // All imposters resolved -> Game transitions to RESULT
+        val finalPhase = if (remainingImposters.isEmpty()) GamePhase.RESULT else GamePhase.FINAL_IMPOSTER_CHOICE
+        assertEquals(GamePhase.RESULT, finalPhase)
+
+        assertEquals(1, securedPoints[3]) // Imposter2 kept their 1 secured point
+        assertEquals(3, securedPoints[4]) // Imposter3 got 1 + 2 = 3
+        assertEquals(0, securedPoints[2]) // Imposter1 got 0
+    }
+
+    // ── Multi-Imposter Guessing: All Remaining Imposters Guess Correctly (+2 Pts) ──
+    @Test
+    fun `multi imposter scenario all remaining imposters guess correctly sequentially with 2 points`() {
+        val players = listOf(
+            Player(0, "Alice", role = Role.CIVILIAN),
+            Player(1, "Bob", role = Role.CIVILIAN),
+            Player(2, "Imposter1", role = Role.IMPOSTER),
+            Player(3, "Imposter2", role = Role.IMPOSTER),
+            Player(4, "Imposter3", role = Role.IMPOSTER),
+        )
+        // Imposter1 eliminated in Round 1
+        val eliminated = mutableListOf(2)
+        val securedPoints = mutableMapOf(2 to 0, 3 to 1, 4 to 1)
+
+        // 1. Imposter2 guesses correctly (+2 pts)
+        securedPoints[3] = (securedPoints[3] ?: 0) + 2
+        eliminated.add(3)
+
+        var remainingImposters = players.filter { it.role == Role.IMPOSTER && it.id !in eliminated }
+        assertEquals(1, remainingImposters.size)
+
+        // 2. Imposter3 also guesses correctly (+2 pts)
+        securedPoints[4] = (securedPoints[4] ?: 0) + 2
+        eliminated.add(4)
+
+        remainingImposters = players.filter { it.role == Role.IMPOSTER && it.id !in eliminated }
+        assertTrue(remainingImposters.isEmpty())
+
+        // Now all imposters resolved -> Game transitions to RESULT
+        val finalPhase = if (remainingImposters.isEmpty()) GamePhase.RESULT else GamePhase.FINAL_IMPOSTER_CHOICE
+        assertEquals(GamePhase.RESULT, finalPhase)
+
+        assertEquals(3, securedPoints[3])
+        assertEquals(3, securedPoints[4])
+        assertEquals(0, securedPoints[2])
     }
 
     // ── Candidate List Disallows Self-Voting ──
@@ -183,7 +292,6 @@ class VotingAndFinalImposterTest {
             Player(2, "Charlie"),
         )
 
-        // Previous match history where Alice was imposter 3 times and was imposter last round
         val state = RandomizerState(
             globalRoundCounter = 5,
             wordUsageHistory = mapOf("apple" to 5),

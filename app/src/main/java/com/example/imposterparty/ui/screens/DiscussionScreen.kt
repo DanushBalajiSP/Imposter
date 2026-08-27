@@ -43,11 +43,13 @@ fun DiscussionScreen(
         modifier = modifier
             .background(DeepSpaceBg)
             .fillMaxSize(),
+        contentAlignment = Alignment.TopCenter,
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier
                 .fillMaxSize()
+                .widthIn(max = 520.dp)
                 .padding(horizontal = 20.dp),
         ) {
             // ── Header ──

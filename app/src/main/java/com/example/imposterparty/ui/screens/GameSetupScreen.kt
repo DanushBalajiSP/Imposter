@@ -189,10 +189,12 @@ fun GameSetupScreen(
         modifier = modifier
             .background(DeepSpaceBg)
             .fillMaxSize(),
+        contentAlignment = Alignment.TopCenter,
     ) {
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
+                .widthIn(max = 560.dp)
                 .padding(horizontal = 20.dp),
             contentPadding = PaddingValues(top = 8.dp, bottom = 110.dp),
         ) {

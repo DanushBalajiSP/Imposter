@@ -5,20 +5,28 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.LibraryBooks
+import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.EmojiEvents
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.SportsEsports
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import com.example.imposterparty.ui.components.UserProfileDialog
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
@@ -61,6 +69,17 @@ fun HomeScreen(
     modifier: Modifier = Modifier,
 ) {
     val gameState by gameViewModel.gameState.collectAsStateWithLifecycle()
+    val currentUser by gameViewModel.currentUser.collectAsStateWithLifecycle()
+    var showProfileDialog by remember { mutableStateOf(false) }
+    val scrollState = rememberScrollState()
+
+    if (showProfileDialog) {
+        UserProfileDialog(
+            gameViewModel = gameViewModel,
+            currentUser = currentUser,
+            onDismiss = { showProfileDialog = false },
+        )
+    }
 
     val isMidGame = gameState.phase == GamePhase.REVEALING ||
             gameState.phase == GamePhase.DISCUSSION ||
@@ -170,16 +189,60 @@ fun HomeScreen(
                     )
                 }
             },
-        contentAlignment = Alignment.Center,
+        contentAlignment = Alignment.TopCenter,
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
+            verticalArrangement = Arrangement.Top,
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 20.dp),
+                .widthIn(max = 480.dp)
+                .verticalScroll(scrollState)
+                .padding(horizontal = 20.dp, vertical = 12.dp),
         ) {
-            Spacer(modifier = Modifier.weight(0.8f))
+            // Top Bar with Profile Button
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 8.dp),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Surface(
+                    color = if (currentUser != null) StitchSurfaceContainerHigh else NeonPurple.copy(alpha = 0.15f),
+                    shape = RoundedCornerShape(9999.dp),
+                    border = BorderStroke(
+                        1.dp,
+                        if (currentUser != null) NeonCyan.copy(alpha = 0.5f) else NeonPurple.copy(alpha = 0.6f),
+                    ),
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(9999.dp))
+                        .clickable { showProfileDialog = true },
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp),
+                    ) {
+                        Icon(
+                            imageVector = if (currentUser != null) Icons.Default.AccountCircle else Icons.Default.Person,
+                            contentDescription = "Profile",
+                            tint = if (currentUser != null) NeonCyan else NeonPurpleGlow,
+                            modifier = Modifier.size(18.dp),
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            text = currentUser?.username ?: "Set Profile",
+                            style = MaterialTheme.typography.labelMedium.copy(
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 0.5.sp,
+                            ),
+                            color = if (currentUser != null) Color.White else NeonPurpleGlow,
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
 
             // ── Hero: Imposter Silhouette ──
             Box(
@@ -295,7 +358,7 @@ fun HomeScreen(
                 modifier = Modifier.widthIn(max = 280.dp),
             )
 
-            Spacer(modifier = Modifier.weight(1f))
+            Spacer(modifier = Modifier.height(28.dp))
 
             // ── Resume In-Progress Game ──
             if (isMidGame) {
@@ -310,8 +373,8 @@ fun HomeScreen(
                     onClick = { onResumeInProgressGame(gameState.phase) },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(64.dp),
-                    shape = RoundedCornerShape(12.dp),
+                        .height(58.dp),
+                    shape = RoundedCornerShape(14.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
                     contentPadding = PaddingValues(0.dp),
                 ) {
@@ -322,11 +385,11 @@ fun HomeScreen(
                                 Brush.horizontalGradient(
                                     listOf(DangerRed, Color(0xFFD50000), ImposterPrimaryDark)
                                 ),
-                                shape = RoundedCornerShape(12.dp),
+                                shape = RoundedCornerShape(14.dp),
                             )
                             .border(
                                 BorderStroke(1.5.dp, WarningYellow),
-                                shape = RoundedCornerShape(12.dp),
+                                shape = RoundedCornerShape(14.dp),
                             ),
                         contentAlignment = Alignment.Center,
                     ) {
@@ -362,7 +425,7 @@ fun HomeScreen(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(14.dp))
             }
 
             // ── Primary CTA: New Game ──
@@ -370,8 +433,8 @@ fun HomeScreen(
                 onClick = onNewGame,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(64.dp),
-                shape = RoundedCornerShape(12.dp),
+                    .height(58.dp),
+                shape = RoundedCornerShape(14.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
                 contentPadding = PaddingValues(0.dp),
             ) {
@@ -382,11 +445,11 @@ fun HomeScreen(
                             Brush.verticalGradient(
                                 listOf(NeonPurpleGlow, NeonPurple)
                             ),
-                            shape = RoundedCornerShape(12.dp),
+                            shape = RoundedCornerShape(14.dp),
                         )
                         .border(
                             BorderStroke(1.dp, PrimaryContainerNeon.copy(alpha = 0.3f)),
-                            shape = RoundedCornerShape(12.dp),
+                            shape = RoundedCornerShape(14.dp),
                         ),
                     contentAlignment = Alignment.Center,
                 ) {
@@ -398,12 +461,12 @@ fun HomeScreen(
                             imageVector = Icons.Default.PlayArrow,
                             contentDescription = null,
                             tint = Color.White,
-                            modifier = Modifier.size(28.dp),
+                            modifier = Modifier.size(26.dp),
                         )
                         Spacer(modifier = Modifier.width(10.dp))
                         Text(
                             text = "New Game",
-                            style = MaterialTheme.typography.headlineSmall.copy(
+                            style = MaterialTheme.typography.titleLarge.copy(
                                 fontWeight = FontWeight.Bold,
                                 letterSpacing = 0.5.sp,
                             ),
@@ -413,7 +476,7 @@ fun HomeScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(14.dp))
 
             // ── Secondary CTA: Word Packs (Cyan glass) ──
             GlassButton(
@@ -425,7 +488,7 @@ fun HomeScreen(
                 onClick = onWordPacks,
             )
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(14.dp))
 
             // ── Tertiary CTA: Scoreboard (Gold glass) ──
             GlassButton(
@@ -437,7 +500,7 @@ fun HomeScreen(
                 onClick = onScoreboard,
             )
 
-            Spacer(modifier = Modifier.weight(0.5f))
+            Spacer(modifier = Modifier.height(24.dp))
         }
     }
 }

@@ -75,11 +75,13 @@ fun VotingScreen(
         modifier = modifier
             .background(DeepSpaceBg)
             .fillMaxSize(),
+        contentAlignment = Alignment.TopCenter,
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier
                 .fillMaxSize()
+                .widthIn(max = 520.dp)
                 .padding(horizontal = 20.dp),
         ) {
             // ── Top Header ──
@@ -90,7 +92,10 @@ fun VotingScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f, fill = false),
+                ) {
                     Icon(
                         imageVector = Icons.Default.HowToVote,
                         contentDescription = null,
@@ -102,11 +107,16 @@ fun VotingScreen(
                         text = if (gameState.isSubRound) "SUB-ROUND ${gameState.subRoundNumber} VOTING" else "SECRET VOTING",
                         style = MaterialTheme.typography.titleMedium.copy(
                             fontWeight = FontWeight.Black,
-                            letterSpacing = 1.5.sp,
+                            letterSpacing = 1.2.sp,
+                            fontSize = 16.sp,
                         ),
                         color = if (gameState.isSubRound) DangerRed else Color.White,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
+
+                Spacer(Modifier.width(8.dp))
 
                 // Voter progress counter pill
                 Box(

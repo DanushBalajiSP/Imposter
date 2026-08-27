@@ -1,0 +1,55 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // --- USERNAMES: Strict Uniqueness & Account Recovery ---
+    match /usernames/{usernameLower} {
+      // Anyone can look up / check if a username exists
+      allow read: if true;
+
+      // Only allow creating if the username document doesn't already exist
+      allow create: if !exists(/databases/$(database)/documents/usernames/$(usernameLower))
+                    && request.resource.data.usernameLower == usernameLower
+                    && request.resource.data.userId is string
+                    && request.resource.data.username is string
+                    && request.resource.data.pinHash is string;
+
+      // Prevent editing or taking over existing username documents
+      allow update, delete: if false;
+    }
+
+    // --- USERS: Profile Records ---
+    match /users/{userId} {
+      allow read: if true;
+      allow create: if request.resource.data.userId == userId
+                    && request.resource.data.username is string
+                    && request.resource.data.pinHash is string;
+      allow update: if request.resource.data.userId == userId;
+    }
+
+    // --- COMMUNITY WORD PACKS ---
+    match /community_packs/{packId} {
+      // Anyone can read and download community packs
+      allow read: if true;
+
+      // Creating a pack: must contain valid author and word list
+      allow create: if request.resource.data.authorId is string
+                    && request.resource.data.authorName is string
+                    && request.resource.data.name is string
+                    && request.resource.data.words is list
+                    && request.resource.data.words.size() > 0;
+
+      // Updating a pack: author can update pack, or any player can increment downloadCount
+      allow update: if (resource.data.authorId == request.resource.data.authorId)
+                    || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['downloadCount']));
+
+      // Deleting a pack: only the author can delete
+      allow delete: if request.resource.data.authorId == resource.data.authorId;
+    }
+
+    // --- MULTIPLAYER ROOMS (Future-proofed) ---
+    match /rooms/{roomId} {
+      allow read, write: if true;
+    }
+  }
+}

@@ -7,6 +7,7 @@ data class WordPack(
     val id: Long = 0,
     val name: String,
     val isBuiltIn: Boolean = false,
+    val authorName: String? = null,
 )
 
 /**

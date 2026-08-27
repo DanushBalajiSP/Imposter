@@ -6,12 +6,21 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.imposterparty.data.local.LocalDataManager
 import com.example.imposterparty.data.model.*
+import com.example.imposterparty.data.remote.CloudWordPackRepository
+import com.example.imposterparty.data.remote.UserManager
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
 class GameViewModel(application: Application) : AndroidViewModel(application) {
 
     private val dataManager = LocalDataManager(application)
+    val userManager = UserManager(application)
+    val cloudWordPackRepo = CloudWordPackRepository()
+
+    val currentUser: StateFlow<UserProfile?> = userManager.currentUser
+
+    val communityPacks: StateFlow<List<CommunityWordPack>> = cloudWordPackRepo.getCommunityPacks()
+        .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
     private fun defaultPlayers(): List<Player> = listOf(
         Player(id = 0, name = "Player 1"),
@@ -506,7 +515,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
 
     // ── Imposter Guess / Sub-Round Phase Handlers ──────────
 
-    fun submitImposterWordGuess(guess: String, volunteerPlayerId: Int? = null) {
+    fun submitImposterWordGuess(guess: String, volunteerPlayerId: Int? = null): Boolean {
         val state = _gameState.value
         val normalizedGuess = com.example.imposterparty.data.randomizer.FairRandomizer.normalizeWord(guess)
         val normalizedSecret = com.example.imposterparty.data.randomizer.FairRandomizer.normalizeWord(state.secretWord)
@@ -527,13 +536,18 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         val allImposters = state.players.filter { it.role == Role.IMPOSTER }
         val remainingImposters = allImposters.filter { it.id !in updatedEliminated }
 
+        val updatedSecured = state.imposterSecuredPoints.toMutableMap()
         val finalScores = mutableMapOf<String, Int>()
 
         if (isCorrect) {
-            // Volunteer gets +3 points instantly
+            // Volunteer gets +2 points added to their secured points
+            if (volunteer != null) {
+                updatedSecured[volunteer.id] = (state.imposterSecuredPoints[volunteer.id] ?: 0) + 2
+            }
+
             allImposters.forEach { imposter ->
-                val secured = state.imposterSecuredPoints[imposter.id] ?: 0
-                finalScores[imposter.name] = if (imposter.id == volunteer?.id) secured + 3 else secured
+                val secured = updatedSecured[imposter.id] ?: 0
+                finalScores[imposter.name] = secured
             }
             state.players.filter { it.role == Role.CIVILIAN }.forEach { civilian ->
                 val priorBonus = state.pendingRoundScores.getOrDefault(civilian.name, 0)
@@ -541,43 +555,46 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             }
 
             if (remainingImposters.isEmpty()) {
-                // Round Ends
+                // All imposters resolved -> Round Ends
                 val newState = state.copy(
                     phase = GamePhase.RESULT,
                     isImposterFound = false,
                     eliminatedPlayerIds = updatedEliminated,
+                    imposterSecuredPoints = updatedSecured,
                     volunteerImposterId = volunteer?.id,
                     imposterGuessWord = guess.trim(),
                     wasWordGuessedCorrectly = true,
-                    finalPhaseDescription = "${volunteer?.name ?: "Imposter"} correctly guessed \"${state.secretWord}\" (+3 pts)!",
+                    finalPhaseDescription = "${volunteer?.name ?: "Imposter"} correctly guessed \"${state.secretWord}\" (+2 pts)! All imposters resolved.",
                     pendingRoundScores = finalScores,
                 )
                 _gameState.value = newState
                 persistCurrentState(newState)
                 saveRoundScores(isCivilianWin = false, roundScoresMap = finalScores)
             } else {
-                // More imposters remain -> continue with remaining imposters
+                // More imposters remain -> Stay in FINAL_IMPOSTER_CHOICE for remaining imposters
                 val updatedPending = state.pendingRoundScores.toMutableMap()
-                if (volunteer != null) {
-                    val secured = state.imposterSecuredPoints[volunteer.id] ?: 0
-                    updatedPending[volunteer.name] = secured + 3
+                allImposters.forEach { imposter ->
+                    updatedPending[imposter.name] = updatedSecured[imposter.id] ?: 0
                 }
+
                 val newState = state.copy(
                     phase = GamePhase.FINAL_IMPOSTER_CHOICE,
                     isImposterFound = false,
                     eliminatedPlayerIds = updatedEliminated,
+                    imposterSecuredPoints = updatedSecured,
                     volunteerImposterId = volunteer?.id,
                     remainingImposterId = remainingImposters.first().id,
                     imposterGuessWord = guess.trim(),
                     wasWordGuessedCorrectly = true,
-                    finalPhaseDescription = "${volunteer?.name ?: "An Imposter"} guessed correctly (+3 pts) and exited! ${remainingImposters.size} Imposter(s) remain.",
+                    finalPhaseDescription = "${volunteer?.name ?: "An Imposter"} correctly guessed \"${state.secretWord}\" (+2 pts) and safely exited! ${remainingImposters.size} Imposter(s) remain.",
                     pendingRoundScores = updatedPending,
                 )
                 _gameState.value = newState
                 persistCurrentState(newState)
             }
+            return true
         } else {
-            // Volunteer Guessed Wrong -> Civilians Win!
+            // Volunteer Guessed Wrong -> Eliminated with 0 bonus (retains secured points)
             allImposters.forEach { imposter ->
                 finalScores[imposter.name] = state.imposterSecuredPoints[imposter.id] ?: 0
             }
@@ -587,19 +604,45 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 finalScores[civilian.name] = 1 + (if (priorBonus > 0) 1 else 0)
             }
 
-            val newState = state.copy(
-                phase = GamePhase.RESULT,
-                isImposterFound = true,
-                eliminatedPlayerIds = updatedEliminated,
-                volunteerImposterId = volunteer?.id,
-                imposterGuessWord = guess.trim(),
-                wasWordGuessedCorrectly = false,
-                finalPhaseDescription = "${volunteer?.name ?: "Imposter"} guessed incorrectly! Civilians Win!",
-                pendingRoundScores = finalScores,
-            )
-            _gameState.value = newState
-            persistCurrentState(newState)
-            saveRoundScores(isCivilianWin = true, roundScoresMap = finalScores)
+            if (remainingImposters.isEmpty()) {
+                // All imposters have been eliminated -> Civilians Win!
+                val newState = state.copy(
+                    phase = GamePhase.RESULT,
+                    isImposterFound = true,
+                    eliminatedPlayerIds = updatedEliminated,
+                    imposterSecuredPoints = updatedSecured,
+                    volunteerImposterId = volunteer?.id,
+                    imposterGuessWord = guess.trim(),
+                    wasWordGuessedCorrectly = false,
+                    finalPhaseDescription = "${volunteer?.name ?: "Imposter"} guessed incorrectly (\"${guess.trim()}\")! All imposters eliminated! Civilians Win!",
+                    pendingRoundScores = finalScores,
+                )
+                _gameState.value = newState
+                persistCurrentState(newState)
+                saveRoundScores(isCivilianWin = true, roundScoresMap = finalScores)
+            } else {
+                // More imposters remain -> Stay in FINAL_IMPOSTER_CHOICE for remaining imposters
+                val updatedPending = state.pendingRoundScores.toMutableMap()
+                allImposters.forEach { imposter ->
+                    updatedPending[imposter.name] = updatedSecured[imposter.id] ?: 0
+                }
+
+                val newState = state.copy(
+                    phase = GamePhase.FINAL_IMPOSTER_CHOICE,
+                    isImposterFound = true,
+                    eliminatedPlayerIds = updatedEliminated,
+                    imposterSecuredPoints = updatedSecured,
+                    volunteerImposterId = volunteer?.id,
+                    remainingImposterId = remainingImposters.first().id,
+                    imposterGuessWord = guess.trim(),
+                    wasWordGuessedCorrectly = false,
+                    finalPhaseDescription = "${volunteer?.name ?: "An Imposter"} guessed incorrectly (\"${guess.trim()}\") and was eliminated! ${remainingImposters.size} Imposter(s) remain.",
+                    pendingRoundScores = updatedPending,
+                )
+                _gameState.value = newState
+                persistCurrentState(newState)
+            }
+            return false
         }
     }
 
@@ -960,15 +1003,17 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
 
     fun getEntriesForPack(packId: Long) = dataManager.getEntriesForPack(packId)
 
-    fun saveWordPack(name: String, entries: List<Pair<String, String?>>) {
+    fun saveWordPack(name: String, entries: List<Pair<String, String?>>, authorName: String? = null) {
         viewModelScope.launch {
-            dataManager.saveWordPack(name, entries)
+            val author = authorName ?: currentUser.value?.username
+            dataManager.saveWordPack(name, entries, author)
         }
     }
 
-    fun updateWordPack(packId: Long, name: String, entries: List<Pair<String, String?>>) {
+    fun updateWordPack(packId: Long, name: String, entries: List<Pair<String, String?>>, authorName: String? = null) {
         viewModelScope.launch {
-            dataManager.updateWordPack(packId, name, entries)
+            val author = authorName ?: currentUser.value?.username
+            dataManager.updateWordPack(packId, name, entries, author)
         }
     }
 
@@ -981,6 +1026,62 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     fun resetRandomizerWeightage() {
         viewModelScope.launch {
             dataManager.resetRandomizerWeightage()
+        }
+    }
+
+    // ── User Profile & Firebase ────────────────────────────
+
+    fun createProfile(username: String, pin: String, onResult: (Result<UserProfile>) -> Unit) {
+        viewModelScope.launch {
+            val result = userManager.createProfile(username, pin)
+            onResult(result)
+        }
+    }
+
+    fun loginProfile(username: String, pin: String, onResult: (Result<UserProfile>) -> Unit) {
+        viewModelScope.launch {
+            val result = userManager.login(username, pin)
+            onResult(result)
+        }
+    }
+
+    fun logoutProfile() {
+        userManager.logout()
+    }
+
+    // ── Community Word Packs ────────────────────────────────
+
+    fun publishWordPackToCommunity(pack: WordPack, onResult: (Result<String>) -> Unit) {
+        val user = currentUser.value
+        if (user == null) {
+            onResult(Result.failure(IllegalStateException("Please set up or log into your profile before publishing word packs.")))
+            return
+        }
+
+        viewModelScope.launch {
+            val entries = dataManager.getEntriesForPackOnce(pack.id)
+            val result = cloudWordPackRepo.publishWordPack(pack, entries, user)
+            onResult(result)
+        }
+    }
+
+    fun downloadCommunityPack(pack: CommunityWordPack, onResult: (Result<Unit>) -> Unit) {
+        viewModelScope.launch {
+            val result = cloudWordPackRepo.downloadCommunityPack(pack, dataManager)
+            onResult(result)
+        }
+    }
+
+    fun deleteCommunityPack(packId: String, onResult: (Result<Unit>) -> Unit) {
+        val user = currentUser.value
+        if (user == null) {
+            onResult(Result.failure(IllegalStateException("Not logged in.")))
+            return
+        }
+
+        viewModelScope.launch {
+            val result = cloudWordPackRepo.deletePublishedPack(packId, user.userId)
+            onResult(result)
         }
     }
 

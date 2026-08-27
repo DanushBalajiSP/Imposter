@@ -7,11 +7,14 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Help
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -21,7 +24,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -29,6 +31,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.imposterparty.data.model.GamePhase
 import com.example.imposterparty.data.model.Role
 import com.example.imposterparty.theme.*
 import com.example.imposterparty.viewmodel.GameViewModel
@@ -42,6 +45,7 @@ fun FinalImposterChoiceScreen(
 ) {
     val gameState by gameViewModel.gameState.collectAsStateWithLifecycle()
     val focusManager = LocalFocusManager.current
+    val scrollState = rememberScrollState()
 
     val activePlayers = remember(gameState.players, gameState.eliminatedPlayerIds) {
         gameState.players.filter { it.id !in gameState.eliminatedPlayerIds }
@@ -50,10 +54,11 @@ fun FinalImposterChoiceScreen(
         activePlayers.filter { it.role == Role.IMPOSTER }
     }
     val accusedPlayer = gameState.players.find { it.id == gameState.accusedPlayerId }
+    val lastVolunteer = gameState.players.find { it.id == gameState.volunteerImposterId }
 
     var isVolunteeringToGuess by remember { mutableStateOf(false) }
     var selectedVolunteerId by remember(activeImposters) {
-        mutableStateOf<Int?>(activeImposters.firstOrNull()?.id)
+        mutableStateOf<Int?>(if (activeImposters.size == 1) activeImposters.first().id else null)
     }
     var wordGuessInput by remember { mutableStateOf("") }
 
@@ -72,14 +77,17 @@ fun FinalImposterChoiceScreen(
         modifier = modifier
             .background(DeepSpaceBg)
             .fillMaxSize(),
+        contentAlignment = Alignment.TopCenter,
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 20.dp),
+                .widthIn(max = 480.dp)
+                .verticalScroll(scrollState)
+                .padding(horizontal = 20.dp, vertical = 16.dp),
         ) {
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(8.dp))
 
             // ── Top Header Badge ──
             Row(
@@ -88,7 +96,7 @@ fun FinalImposterChoiceScreen(
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Icon(
-                    imageVector = Icons.Default.Help,
+                    imageVector = Icons.AutoMirrored.Filled.Help,
                     contentDescription = null,
                     tint = NeonGold,
                     modifier = Modifier.size(22.dp),
@@ -106,21 +114,48 @@ fun FinalImposterChoiceScreen(
 
             Spacer(Modifier.height(14.dp))
 
-            // ── Status Banner (Anonymous) ──
+            // ── Status Banner (Celebration or Elimination Notice) ──
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(18.dp))
                     .background(StitchSurfaceContainer)
                     .border(
-                        BorderStroke(1.dp, OutlineSubtle.copy(alpha = 0.35f)),
+                        BorderStroke(
+                            1.dp,
+                            when {
+                                gameState.wasWordGuessedCorrectly == true && lastVolunteer != null -> NeonCyan.copy(alpha = 0.6f)
+                                gameState.wasWordGuessedCorrectly == false && lastVolunteer != null -> DangerRed.copy(alpha = 0.6f)
+                                else -> OutlineSubtle.copy(alpha = 0.35f)
+                            }
+                        ),
                         RoundedCornerShape(18.dp),
                     )
                     .padding(vertical = 12.dp, horizontal = 16.dp),
                 contentAlignment = Alignment.Center,
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    if (accusedPlayer != null) {
+                    if (gameState.wasWordGuessedCorrectly == true && lastVolunteer != null) {
+                        Text(
+                            text = "🎉 ${lastVolunteer.name} guessed correctly (+2 pts) & escaped!",
+                            style = MaterialTheme.typography.bodyMedium.copy(
+                                fontWeight = FontWeight.Bold,
+                            ),
+                            color = NeonCyanSoft,
+                            textAlign = TextAlign.Center,
+                        )
+                        Spacer(Modifier.height(2.dp))
+                    } else if (gameState.wasWordGuessedCorrectly == false && lastVolunteer != null) {
+                        Text(
+                            text = "❌ ${lastVolunteer.name} guessed incorrectly and was eliminated!",
+                            style = MaterialTheme.typography.bodyMedium.copy(
+                                fontWeight = FontWeight.Bold,
+                            ),
+                            color = DangerRed,
+                            textAlign = TextAlign.Center,
+                        )
+                        Spacer(Modifier.height(2.dp))
+                    } else if (accusedPlayer != null) {
                         Text(
                             text = "${accusedPlayer.name} was eliminated!",
                             style = MaterialTheme.typography.bodyMedium.copy(
@@ -131,7 +166,7 @@ fun FinalImposterChoiceScreen(
                         Spacer(Modifier.height(2.dp))
                     }
                     Text(
-                        text = "${activePlayers.size} Players Remaining",
+                        text = "${activePlayers.size} Active Players • ${activeImposters.size} Imposter${if (activeImposters.size > 1) "s" else ""} Remaining",
                         style = MaterialTheme.typography.labelSmall.copy(
                             fontWeight = FontWeight.Bold,
                             letterSpacing = 1.sp,
@@ -197,7 +232,7 @@ fun FinalImposterChoiceScreen(
                             Spacer(Modifier.height(10.dp))
 
                             Text(
-                                text = "• Yes: An imposter volunteers to guess for an instant +3 pts (eliminated if correct, Civilians win if wrong).\n• No: Proceed to the Sub-Round with a new secret word.",
+                                text = "• Yes: An imposter volunteers in private to guess the secret word for +2 pts (eliminated if correct or wrong).\n• No: Proceed to the Sub-Round with a new secret word.",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = OnSurfaceVariant,
                                 textAlign = TextAlign.Center,
@@ -205,12 +240,15 @@ fun FinalImposterChoiceScreen(
                         }
                     }
 
-                    Spacer(Modifier.weight(1f))
+                    Spacer(Modifier.height(24.dp))
 
                     // ── Choice Buttons ──
                     // YES Button (Gold/Amber)
                     Button(
-                        onClick = { isVolunteeringToGuess = true },
+                        onClick = {
+                            selectedVolunteerId = if (activeImposters.size == 1) activeImposters.first().id else null
+                            isVolunteeringToGuess = true
+                        },
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(58.dp),
@@ -229,7 +267,7 @@ fun FinalImposterChoiceScreen(
                             )
                             Spacer(Modifier.width(10.dp))
                             Text(
-                                text = "Yes, Guess Secret Word (+3 pts)",
+                                text = "Yes, Guess Secret Word (+2 pts)",
                                 style = MaterialTheme.typography.titleMedium.copy(
                                     fontWeight = FontWeight.Black,
                                     fontSize = 16.sp,
@@ -291,11 +329,9 @@ fun FinalImposterChoiceScreen(
                     Spacer(Modifier.height(16.dp))
                 }
             } else {
-                // ── Imposter Volunteer Input View ──
+                // ── Imposter Volunteer Private Input View ──
                 Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f),
+                    modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(14.dp),
                 ) {
                     Box(
@@ -319,7 +355,7 @@ fun FinalImposterChoiceScreen(
                                 )
                                 Spacer(Modifier.width(8.dp))
                                 Text(
-                                    text = "Imposter Word Guess",
+                                    text = "🔒 Private Imposter Action",
                                     style = MaterialTheme.typography.titleLarge.copy(
                                         fontWeight = FontWeight.Black,
                                     ),
@@ -330,7 +366,7 @@ fun FinalImposterChoiceScreen(
                             Spacer(Modifier.height(8.dp))
 
                             Text(
-                                text = "The volunteering imposter is stepping forward! Enter the exact secret word below:",
+                                text = "Pass the device privately to the volunteering imposter:",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = Color.White,
                             )
@@ -338,7 +374,7 @@ fun FinalImposterChoiceScreen(
                             if (activeImposters.size > 1) {
                                 Spacer(Modifier.height(14.dp))
                                 Text(
-                                    text = "Select Volunteering Player:",
+                                    text = "Select who you are:",
                                     style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
                                     color = OnSurfaceVariant,
                                 )
@@ -353,7 +389,7 @@ fun FinalImposterChoiceScreen(
                                             modifier = Modifier
                                                 .weight(1f)
                                                 .clip(RoundedCornerShape(10.dp))
-                                                .background(if (isSelected) NeonGold.copy(alpha = 0.2f) else StitchSurfaceContainer)
+                                                .background(if (isSelected) NeonGold.copy(alpha = 0.25f) else StitchSurfaceContainer)
                                                 .border(
                                                     BorderStroke(
                                                         if (isSelected) 1.5.dp else 1.dp,
@@ -362,7 +398,7 @@ fun FinalImposterChoiceScreen(
                                                     RoundedCornerShape(10.dp),
                                                 )
                                                 .clickable { selectedVolunteerId = imposter.id }
-                                                .padding(vertical = 8.dp, horizontal = 4.dp),
+                                                .padding(vertical = 10.dp, horizontal = 4.dp),
                                             contentAlignment = Alignment.Center,
                                         ) {
                                             Text(
@@ -376,6 +412,15 @@ fun FinalImposterChoiceScreen(
                                         }
                                     }
                                 }
+                            } else if (activeImposters.isNotEmpty()) {
+                                Spacer(Modifier.height(10.dp))
+                                Text(
+                                    text = "Volunteering: ${activeImposters.first().name}",
+                                    style = MaterialTheme.typography.bodyMedium.copy(
+                                        fontWeight = FontWeight.Bold,
+                                    ),
+                                    color = NeonGold,
+                                )
                             }
 
                             Spacer(Modifier.height(16.dp))
@@ -408,7 +453,7 @@ fun FinalImposterChoiceScreen(
                                     .padding(10.dp),
                             ) {
                                 Text(
-                                    text = "⚠️ Correct = +3 pts instant & eliminated • Wrong = Civilians Win",
+                                    text = "⚠️ Correct = +2 pts added to your score & you exit safely • Wrong = You are eliminated with 0 bonus",
                                     style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
                                     color = WarningYellow,
                                     textAlign = TextAlign.Center,
@@ -418,17 +463,27 @@ fun FinalImposterChoiceScreen(
 
                             Spacer(Modifier.height(16.dp))
 
+                            val effectiveVolunteerId = selectedVolunteerId ?: (if (activeImposters.size == 1) activeImposters.first().id else null)
+                            val isSubmitEnabled = wordGuessInput.isNotBlank() && effectiveVolunteerId != null
+
                             Button(
                                 onClick = {
-                                    if (wordGuessInput.isNotBlank()) {
+                                    if (isSubmitEnabled && effectiveVolunteerId != null) {
                                         gameViewModel.submitImposterWordGuess(
                                             guess = wordGuessInput.trim(),
-                                            volunteerPlayerId = selectedVolunteerId,
+                                            volunteerPlayerId = effectiveVolunteerId,
                                         )
-                                        onNavigateToResult()
+                                        if (gameViewModel.gameState.value.phase == GamePhase.FINAL_IMPOSTER_CHOICE) {
+                                            // Another imposter is still active! Reset input and prompt again for remaining imposters
+                                            isVolunteeringToGuess = false
+                                            wordGuessInput = ""
+                                            selectedVolunteerId = null
+                                        } else {
+                                            onNavigateToResult()
+                                        }
                                     }
                                 },
-                                enabled = wordGuessInput.isNotBlank(),
+                                enabled = isSubmitEnabled,
                                 colors = ButtonDefaults.buttonColors(containerColor = NeonGold),
                                 shape = RoundedCornerShape(12.dp),
                                 modifier = Modifier
@@ -446,7 +501,11 @@ fun FinalImposterChoiceScreen(
                             Spacer(Modifier.height(8.dp))
 
                             TextButton(
-                                onClick = { isVolunteeringToGuess = false },
+                                onClick = {
+                                    isVolunteeringToGuess = false
+                                    wordGuessInput = ""
+                                    selectedVolunteerId = null
+                                },
                                 modifier = Modifier.fillMaxWidth(),
                             ) {
                                 Text(

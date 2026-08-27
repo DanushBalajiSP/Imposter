@@ -155,9 +155,13 @@ class LocalDataManager(private val context: Context) {
         return _allEntries.value.filter { it.packId == packId }
     }
 
-    suspend fun saveWordPack(name: String, entries: List<Pair<String, String?>>) = withContext(Dispatchers.IO) {
+    suspend fun saveWordPack(
+        name: String,
+        entries: List<Pair<String, String?>>,
+        authorName: String? = null,
+    ) = withContext(Dispatchers.IO) {
         val newPackId = System.currentTimeMillis()
-        val newPack = WordPack(id = newPackId, name = name, isBuiltIn = false)
+        val newPack = WordPack(id = newPackId, name = name, isBuiltIn = false, authorName = authorName)
 
         val newEntries = entries.mapIndexed { index, (word, clue) ->
             WordEntry(
@@ -181,9 +185,19 @@ class LocalDataManager(private val context: Context) {
         })
     }
 
-    suspend fun updateWordPack(packId: Long, name: String, entries: List<Pair<String, String?>>) = withContext(Dispatchers.IO) {
+    suspend fun updateWordPack(
+        packId: Long,
+        name: String,
+        entries: List<Pair<String, String?>>,
+        authorName: String? = null,
+    ) = withContext(Dispatchers.IO) {
         val updatedPacks = _allPacks.value.map {
-            if (it.id == packId) it.copy(name = name) else it
+            if (it.id == packId) {
+                it.copy(
+                    name = name,
+                    authorName = authorName ?: it.authorName
+                )
+            } else it
         }
 
         val filteredEntries = _allEntries.value.filter { it.packId != packId }
