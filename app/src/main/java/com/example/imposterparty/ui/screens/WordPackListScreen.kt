@@ -687,6 +687,22 @@ private fun WordPackItemCard(
         }
     }
 
+    // Determine if the current user owns this pack (locally created or matches profile username)
+    val isOwnPack = remember(pack.isBuiltIn, pack.authorName, authorTag, currentUser?.username) {
+        if (pack.isBuiltIn) false
+        else {
+            val currentName = currentUser?.username
+            when {
+                pack.authorName == null -> true // Locally created pack
+                pack.authorName.equals("You", ignoreCase = true) -> true
+                currentName != null && pack.authorName.equals(currentName, ignoreCase = true) -> true
+                authorTag == null || authorTag.equals("You", ignoreCase = true) -> true
+                currentName != null && authorTag.equals(currentName, ignoreCase = true) -> true
+                else -> false
+            }
+        }
+    }
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -814,49 +830,52 @@ private fun WordPackItemCard(
                 }
             }
 
-            // Edit, Publish & Delete Buttons for Custom Packs
+            // Edit, Publish & Delete Buttons for Custom / Community Packs
             if (!pack.isBuiltIn) {
                 Spacer(Modifier.width(8.dp))
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
-                    // Publish Button
-                    IconButton(
-                        onClick = onPublish,
-                        enabled = !isPublishing,
-                        modifier = Modifier.size(32.dp),
-                    ) {
-                        if (isPublishing) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(16.dp),
-                                strokeWidth = 2.dp,
-                                color = NeonCyan,
-                            )
-                        } else {
-                            Icon(
-                                imageVector = Icons.Default.CloudUpload,
-                                contentDescription = "Publish to Community",
-                                tint = NeonCyan,
-                                modifier = Modifier.size(20.dp),
-                            )
+                    // Upload / Publish Button (ONLY shown for locally created / owned packs)
+                    if (isOwnPack) {
+                        IconButton(
+                            onClick = onPublish,
+                            enabled = !isPublishing,
+                            modifier = Modifier.size(32.dp),
+                        ) {
+                            if (isPublishing) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(16.dp),
+                                    strokeWidth = 2.dp,
+                                    color = NeonCyan,
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = Icons.Default.CloudUpload,
+                                    contentDescription = "Publish to Community",
+                                    tint = NeonCyan,
+                                    modifier = Modifier.size(20.dp),
+                                )
+                            }
                         }
                     }
 
-                    // Edit Button
+                    // Edit Button (Enabled for owned packs, Disabled for cloned/community packs)
                     IconButton(
                         onClick = onEdit,
+                        enabled = isOwnPack,
                         modifier = Modifier.size(32.dp),
                     ) {
                         Icon(
                             imageVector = Icons.Default.Edit,
-                            contentDescription = "Edit pack",
-                            tint = PrimaryContainerNeon,
+                            contentDescription = if (isOwnPack) "Edit pack" else "Community pack (Read only)",
+                            tint = if (isOwnPack) PrimaryContainerNeon else OnSurfaceVariant.copy(alpha = 0.25f),
                             modifier = Modifier.size(18.dp),
                         )
                     }
 
-                    // Delete Button
+                    // Delete Button (Always available so user can remove custom or downloaded packs)
                     IconButton(
                         onClick = onDelete,
                         modifier = Modifier.size(32.dp),
